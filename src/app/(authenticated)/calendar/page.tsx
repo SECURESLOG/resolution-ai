@@ -12,6 +12,7 @@ import {
   Home,
   CheckCircle,
   XCircle,
+  Users,
 } from "lucide-react";
 import {
   format,
@@ -32,11 +33,17 @@ interface ScheduledTask {
   endTime: string;
   status: string;
   aiReasoning?: string;
+  assignedToUserId: string;
   task: {
     id: string;
     name: string;
     type: string;
     duration: number;
+  };
+  assignedTo?: {
+    id: string;
+    name: string | null;
+    image: string | null;
   };
 }
 
@@ -62,7 +69,7 @@ export default function CalendarPage() {
 
         const [calendarRes, tasksRes] = await Promise.all([
           fetch(`/api/calendar?start=${startStr}&end=${endStr}`),
-          fetch(`/api/scheduled-tasks?view=week&date=${startStr}`),
+          fetch(`/api/scheduled-tasks?view=week&date=${startStr}&family=true`),
         ]);
 
         if (calendarRes.ok) {
@@ -120,9 +127,14 @@ export default function CalendarPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            Calendar
+            <span title="Family View">
+              <Users className="h-6 w-6 text-purple-600" />
+            </span>
+          </h1>
           <p className="text-gray-600 mt-1">
-            View your schedule and AI-planned tasks
+            Unified view of all family members&apos; schedules and tasks
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -212,9 +224,24 @@ export default function CalendarPage() {
                           <p className={`font-medium truncate ${task.status === "completed" ? "line-through" : ""}`}>
                             {task.task.name}
                           </p>
-                          <p className="text-gray-500">
-                            {format(parseISO(task.startTime), "h:mm a")}
-                          </p>
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <span>{format(parseISO(task.startTime), "h:mm a")}</span>
+                            {task.assignedTo && (
+                              <span className="flex items-center gap-0.5" title={task.assignedTo.name || "Unknown"}>
+                                {task.assignedTo.image ? (
+                                  <img
+                                    src={task.assignedTo.image}
+                                    alt={task.assignedTo.name || ""}
+                                    className="w-3 h-3 rounded-full"
+                                  />
+                                ) : (
+                                  <span className="w-3 h-3 rounded-full bg-gray-300 flex items-center justify-center text-[6px] font-bold text-gray-600">
+                                    {task.assignedTo.name?.charAt(0) || "?"}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-1 mt-1">
@@ -265,6 +292,10 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-50 border-l-4 border-green-500 rounded"></div>
               <span className="text-sm text-gray-600">Household Tasks</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold text-gray-600">A</div>
+              <span className="text-sm text-gray-600">Assigned Member</span>
             </div>
           </div>
         </CardContent>

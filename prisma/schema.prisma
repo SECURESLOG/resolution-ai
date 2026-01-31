@@ -57,6 +57,8 @@ model User {
   familyMember      FamilyMember?
   externalCalendars ExternalCalendar[]
   addinTokens       AddinToken[]
+  userPreferences   UserPreference[]
+  notifications     Notification[]
 }
 
 model ExternalCalendar {
@@ -100,8 +102,9 @@ model Family {
   inviteCode String   @unique
   createdAt  DateTime @default(now())
 
-  members FamilyMember[]
-  tasks   Task[]
+  members      FamilyMember[]
+  tasks        Task[]
+  agentMemory  AgentMemory[]
 }
 
 model FamilyMember {
@@ -154,8 +157,24 @@ model Feedback {
   id              String   @id @default(cuid())
   scheduledTaskId String
   userId          String
-  actualDuration  Int?     // in minutes
+
+  // Time feedback
+  actualDuration  Int?     // How long it actually took (minutes)
+  timeAccuracy    String?  // "too_short", "just_right", "too_long"
+
+  // Scheduling feedback
+  timeSlotRating  Int?     // 1-5 how good was this time slot
+  wouldReschedule String?  // "earlier", "later", "different_day", "no"
+  preferredTime   String?  // "morning", "afternoon", "evening", "weekend"
+
+  // Context feedback
+  trafficImpact   Boolean? // Was traffic a factor?
+  weatherImpact   Boolean? // Was weather a factor?
+  energyLevel     String?  // "low", "medium", "high"
+
+  // Free-form
   notes           String?  @db.Text
+
   createdAt       DateTime @default(now())
 
   scheduledTask ScheduledTask @relation(fields: [scheduledTaskId], references: [id], onDelete: Cascade)
@@ -189,4 +208,64 @@ model ProgressTracking {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, weekStartDate, taskType])
+}
+
+// ============================================
+// AI AGENT SYSTEM MODELS
+// ============================================
+
+// Store learned user preferences from feedback
+model UserPreference {
+  id         String   @id @default(cuid())
+  userId     String
+  key        String   // e.g., "preferred_gym_time", "commute_buffer", "energy_pattern"
+  value      Json     // Flexible storage for different preference types
+  confidence Float    @default(0.5) // 0-1, how confident the system is in this preference
+  source     String   @default("inferred") // "inferred", "explicit", "default"
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+// Store agent conversation context and decision history
+model AgentMemory {
+  id        String   @id @default(cuid())
+  familyId  String
+  agentType String   // "interactive", "weekly_planner", "reminder", "optimizer"
+  sessionId String?  // For grouping related interactions
+  context   Json     // Stored conversation/decision context
+  summary   String?  @db.Text // Human-readable summary of what happened
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, agentType])
+  @@index([expiresAt])
+}
+
+// Notification queue for reminders and agent messages
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String    // "reminder", "suggestion", "weekly_plan", "conflict", "achievement"
+  title        String
+  message      String    @db.Text
+  actionUrl    String?   // Deep link to relevant page
+  actionLabel  String?   // Button text like "View Schedule"
+  priority     String    @default("normal") // "low", "normal", "high", "urgent"
+  metadata     Json?     // Additional data for the notification
+  scheduledFor DateTime  // When to show/send the notification
+  sentAt       DateTime? // When it was actually sent
+  readAt       DateTime? // When user read it
+  dismissedAt  DateTime? // When user dismissed it
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@index([userId, readAt])
 }

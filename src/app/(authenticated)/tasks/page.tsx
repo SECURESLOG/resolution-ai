@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,11 @@ const CATEGORIES = {
 };
 
 export default function TasksPage() {
+  const searchParams = useSearchParams();
+  const typeFilter = searchParams.get("type");
+  const resolutionRef = useRef<HTMLDivElement>(null);
+  const householdRef = useRef<HTMLDivElement>(null);
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +54,21 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  // Scroll to the appropriate section based on URL parameter
+  useEffect(() => {
+    if (!loading && typeFilter) {
+      const ref = typeFilter === "resolution" ? resolutionRef : householdRef;
+      if (ref.current) {
+        ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Add a highlight effect
+        ref.current.classList.add("ring-2", "ring-blue-500", "ring-offset-2");
+        setTimeout(() => {
+          ref.current?.classList.remove("ring-2", "ring-blue-500", "ring-offset-2");
+        }, 2000);
+      }
+    }
+  }, [loading, typeFilter]);
 
   async function fetchTasks() {
     try {
@@ -307,7 +328,7 @@ export default function TasksPage() {
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Resolution Tasks */}
-        <Card>
+        <Card ref={resolutionRef} className="transition-all duration-300">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Target className="h-5 w-5 text-blue-600" />
@@ -349,7 +370,7 @@ export default function TasksPage() {
         </Card>
 
         {/* Household Tasks */}
-        <Card>
+        <Card ref={householdRef} className="transition-all duration-300">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Home className="h-5 w-5 text-green-600" />

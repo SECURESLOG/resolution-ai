@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TaskFeedbackDialog } from "@/components/feedback/task-feedback-dialog";
 import {
   Calendar,
   CheckCircle,
@@ -17,6 +18,7 @@ import {
   Home,
   AlertCircle,
   Loader2,
+  Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { AIScheduleResponse, ScheduleRecommendation } from "@/types";
@@ -54,6 +56,8 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [scheduleResult, setScheduleResult] = useState<AIScheduleResponse | null>(null);
   const [approving, setApproving] = useState(false);
+  const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -127,13 +131,23 @@ export default function DashboardPage() {
     }
   }
 
-  async function updateTaskStatus(taskId: string, status: string) {
+  async function updateTaskStatus(taskId: string, status: string, askForFeedback = false) {
     try {
       await fetch(`/api/scheduled-tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
+
+      // If completing a task, show feedback dialog
+      if (status === "completed" && askForFeedback) {
+        const task = todaySchedule.find(t => t.id === taskId);
+        if (task) {
+          setFeedbackTask(task);
+          setShowFeedback(true);
+        }
+      }
+
       fetchData();
     } catch (error) {
       console.error("Error updating task:", error);
@@ -354,7 +368,8 @@ export default function DashboardPage() {
                         onClick={() =>
                           updateTaskStatus(
                             item.id,
-                            item.status === "completed" ? "pending" : "completed"
+                            item.status === "completed" ? "pending" : "completed",
+                            item.status !== "completed" // Ask for feedback when completing
                           )
                         }
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -362,6 +377,7 @@ export default function DashboardPage() {
                             ? "bg-green-600 border-green-600"
                             : "border-gray-300 hover:border-blue-600"
                         }`}
+                        title={item.status === "completed" ? "Mark as pending" : "Mark as complete"}
                       >
                         {item.status === "completed" && (
                           <CheckCircle className="h-3 w-3 text-white" />
@@ -381,9 +397,20 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <Badge variant={item.task.type === "resolution" ? "default" : "secondary"}>
-                      {item.task.type}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {item.status === "completed" && (
+                        <button
+                          onClick={() => updateTaskStatus(item.id, "pending")}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Undo - mark as pending"
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      <Badge variant={item.task.type === "resolution" ? "default" : "secondary"}>
+                        {item.task.type}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -415,16 +442,20 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-4 bg-blue-50 rounded-lg text-center">
-                <Target className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-blue-600">{stats?.resolutionTasks || 0}</p>
-                <p className="text-sm text-blue-600">Resolutions</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg text-center">
-                <Home className="h-6 w-6 text-green-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-green-600">{stats?.householdTasks || 0}</p>
-                <p className="text-sm text-green-600">Household</p>
-              </div>
+              <Link href="/tasks?type=resolution" className="block">
+                <div className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors cursor-pointer">
+                  <Target className="h-6 w-6 text-blue-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-blue-600">{stats?.resolutionTasks || 0}</p>
+                  <p className="text-sm text-blue-600">Resolutions</p>
+                </div>
+              </Link>
+              <Link href="/tasks?type=household" className="block">
+                <div className="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100 transition-colors cursor-pointer">
+                  <Home className="h-6 w-6 text-green-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-green-600">{stats?.householdTasks || 0}</p>
+                  <p className="text-sm text-green-600">Household</p>
+                </div>
+              </Link>
             </div>
 
             <Link href="/tasks">
@@ -436,6 +467,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Task Feedback Dialog */}
+      {feedbackTask && (
+        <TaskFeedbackDialog
+          open={showFeedback}
+          onOpenChange={setShowFeedback}
+          scheduledTaskId={feedbackTask.id}
+          taskName={feedbackTask.task.name}
+          scheduledDuration={feedbackTask.task.duration}
+          onSubmit={() => {
+            setFeedbackTask(null);
+          }}
+        />
+      )}
     </div>
   );
 }
