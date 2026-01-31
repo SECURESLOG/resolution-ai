@@ -253,7 +253,7 @@ export default function OutlookAddinPage() {
 
             <div className="text-center">
               <a
-                href="https://localhost:3000/settings"
+                href="/settings"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"

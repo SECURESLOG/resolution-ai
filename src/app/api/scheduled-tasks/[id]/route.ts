@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { deleteCalendarEvent } from "@/lib/calendar";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const updateSchema = z.object({
   status: z.enum(["pending", "completed", "skipped"]).optional(),
 });

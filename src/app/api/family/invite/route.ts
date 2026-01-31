@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { sendFamilyInviteEmail } from "@/lib/email";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const inviteSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 });

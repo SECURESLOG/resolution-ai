@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { getCalendarEvents } from "@/lib/calendar";
 import { startOfWeek, endOfWeek, parseISO } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

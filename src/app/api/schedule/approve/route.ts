@@ -6,6 +6,8 @@ import { createCalendarEvent, deleteCalendarEvent } from "@/lib/calendar";
 import { z } from "zod";
 import { parseISO, parse, startOfWeek, endOfWeek, addDays } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 const approveSchema = z.object({
   recommendations: z.array(
     z.object({

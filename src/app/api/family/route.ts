@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 
+export const dynamic = "force-dynamic";
+
 const createFamilySchema = z.object({
   name: z.string().min(1, "Family name is required"),
 });

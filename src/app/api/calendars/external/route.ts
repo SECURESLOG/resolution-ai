@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const addCalendarSchema = z.object({
   name: z.string().min(1, "Calendar name is required"),
   url: z.string().url("Please enter a valid URL").refine(
