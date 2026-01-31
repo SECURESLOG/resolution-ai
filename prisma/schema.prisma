@@ -56,6 +56,7 @@ model User {
   progress          ProgressTracking[]
   familyMember      FamilyMember?
   externalCalendars ExternalCalendar[]
+  addinTokens       AddinToken[]
 }
 
 model ExternalCalendar {
@@ -72,6 +73,17 @@ model ExternalCalendar {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, url])
+}
+
+model AddinToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  name      String   @default("Outlook Add-in") // Device/app name
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -121,16 +133,17 @@ model Task {
 }
 
 model ScheduledTask {
-  id              String   @id @default(cuid())
-  taskId          String
-  assignedToUserId String
-  scheduledDate   DateTime
-  startTime       DateTime
-  endTime         DateTime
-  status          String   @default("pending") // "pending", "completed", "skipped"
-  calendarEventId String?
-  aiReasoning     String?  @db.Text
-  createdAt       DateTime @default(now())
+  id                  String   @id @default(cuid())
+  taskId              String
+  assignedToUserId    String
+  scheduledDate       DateTime
+  startTime           DateTime
+  endTime             DateTime
+  status              String   @default("pending") // "pending", "completed", "skipped"
+  calendarEventId     String?  // Primary calendar (Google) event ID
+  workCalendarEventId String?  // Work calendar (M365 via add-in) event ID
+  aiReasoning         String?  @db.Text
+  createdAt           DateTime @default(now())
 
   task       Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   assignedTo User       @relation(fields: [assignedToUserId], references: [id], onDelete: Cascade)

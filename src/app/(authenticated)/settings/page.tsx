@@ -28,6 +28,9 @@ import {
   Trash2,
   Link,
   ExternalLink,
+  Copy,
+  Check,
+  Monitor,
 } from "lucide-react";
 
 interface CalendarProviders {
@@ -54,15 +57,22 @@ export default function SettingsPage() {
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Outlook Add-in state
+  const [addinToken, setAddinToken] = useState<string | null>(null);
+  const [addinTokenExpiry, setAddinTokenExpiry] = useState<string | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   async function fetchData() {
     try {
-      const [providersRes, calendarsRes] = await Promise.all([
+      const [providersRes, calendarsRes, tokenRes] = await Promise.all([
         fetch("/api/calendar/providers"),
         fetch("/api/calendars/external"),
+        fetch("/api/addin/token"),
       ]);
 
       if (providersRes.ok) {
@@ -72,10 +82,51 @@ export default function SettingsPage() {
         const data = await calendarsRes.json();
         setExternalCalendars(data.calendars || []);
       }
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        setAddinToken(tokenData.token);
+        setAddinTokenExpiry(tokenData.expiresAt);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function generateAddinToken() {
+    setGeneratingToken(true);
+    try {
+      const res = await fetch("/api/addin/token");
+      if (res.ok) {
+        const data = await res.json();
+        setAddinToken(data.token);
+        setAddinTokenExpiry(data.expiresAt);
+      }
+    } catch (error) {
+      console.error("Error generating token:", error);
+    } finally {
+      setGeneratingToken(false);
+    }
+  }
+
+  async function revokeAddinToken() {
+    try {
+      const res = await fetch("/api/addin/token", { method: "DELETE" });
+      if (res.ok) {
+        setAddinToken(null);
+        setAddinTokenExpiry(null);
+      }
+    } catch (error) {
+      console.error("Error revoking token:", error);
+    }
+  }
+
+  function copyToken() {
+    if (addinToken) {
+      navigator.clipboard.writeText(addinToken);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
     }
   }
 
@@ -379,6 +430,89 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Outlook Add-in Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Monitor className="h-5 w-5 text-gray-600" />
+            <CardTitle>Outlook Add-in</CardTitle>
+          </div>
+          <CardDescription>
+            Sync tasks to your corporate M365 calendar
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-blue-800">
+              The Outlook Add-in lets you sync your AI-scheduled tasks directly to your
+              work calendar in Microsoft 365, without requiring IT admin approval.
+            </p>
+          </div>
+
+          {addinToken ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <Label className="text-sm text-gray-600">Connection Token</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <code className="flex-1 text-sm font-mono bg-white px-3 py-2 rounded border truncate">
+                    {addinToken.substring(0, 20)}...
+                  </code>
+                  <Button variant="outline" size="icon" onClick={copyToken}>
+                    {tokenCopied ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Expires: {addinTokenExpiry ? new Date(addinTokenExpiry).toLocaleDateString() : "N/A"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">How to use:</p>
+                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                  <li>Install the ResolutionAI add-in in Outlook</li>
+                  <li>Open the add-in from the ribbon</li>
+                  <li>Paste the token above to connect</li>
+                  <li>Click Sync to add tasks to your work calendar</li>
+                </ol>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={revokeAddinToken}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Revoke Token
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Monitor className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium mb-2">No token generated</p>
+              <p className="text-sm text-gray-500 mb-4">
+                Generate a token to connect the Outlook Add-in
+              </p>
+              <Button onClick={generateAddinToken} disabled={generatingToken}>
+                {generatingToken ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  "Generate Token"
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* About Section */}
       <Card>
         <CardHeader>
@@ -400,6 +534,7 @@ export default function SettingsPage() {
             <Badge variant="secondary">Claude AI</Badge>
             <Badge variant="secondary">Google Calendar API</Badge>
             <Badge variant="secondary">ICS Import</Badge>
+            <Badge variant="secondary">Outlook Add-in</Badge>
             <Badge variant="secondary">PostgreSQL</Badge>
             <Badge variant="secondary">TailwindCSS</Badge>
           </div>
