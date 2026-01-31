@@ -153,7 +153,7 @@ export default function OutlookAddinPage() {
 
           // Mark as synced (user will save the appointment)
           await markTaskSynced(task.id, `outlook_${Date.now()}`);
-          setSyncedTasks(new Set([...syncedTasks, task.id]));
+          setSyncedTasks(prev => new Set(Array.from(prev).concat(task.id)));
         } else {
           throw new Error("Calendar API not available");
         }
@@ -161,7 +161,7 @@ export default function OutlookAddinPage() {
         // Fallback for testing outside Outlook
         console.log("Would create event:", task);
         await markTaskSynced(task.id, `test_${Date.now()}`);
-        setSyncedTasks(new Set([...syncedTasks, task.id]));
+        setSyncedTasks(prev => new Set(Array.from(prev).concat(task.id)));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sync task");
