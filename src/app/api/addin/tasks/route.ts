@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { startOfWeek, endOfWeek } from "date-fns";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 // GET - Fetch pending tasks for the add-in to sync
 export async function GET(request: NextRequest) {
   try {

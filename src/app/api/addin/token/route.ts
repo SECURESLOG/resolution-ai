@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { randomBytes } from "crypto";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 // GET - Get or create an add-in token for the current user
 export async function GET() {
   try {
