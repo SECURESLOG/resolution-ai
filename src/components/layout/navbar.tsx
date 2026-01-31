@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users } from "lucide-react";
+import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -25,6 +25,7 @@ export function Navbar() {
     { href: "/tasks", label: "Tasks", icon: CheckSquare },
     { href: "/calendar", label: "Calendar", icon: Calendar },
     { href: "/family", label: "Family", icon: Users },
+    { href: "/assistant", label: "AI Assistant", icon: Sparkles },
   ];
 
   return (
