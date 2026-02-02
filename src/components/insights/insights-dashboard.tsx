@@ -14,6 +14,11 @@ import {
   Lightbulb,
   Award,
   BarChart3,
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  X,
+  Sparkles,
 } from "lucide-react";
 
 interface TimePattern {
@@ -60,6 +65,48 @@ interface WeeklyProgress {
   rate: number;
 }
 
+interface ConflictPattern {
+  taskId: string;
+  taskName: string;
+  taskType: string;
+  taskCategory: string | null;
+  totalMoves: number;
+  averageMovesPerWeek: number;
+}
+
+interface ConflictSummary {
+  totalConflicts: number;
+  conflictsThisWeek: number;
+  mostRescheduledTasks: ConflictPattern[];
+  resolutionTypes: {
+    displaced: number;
+    shortened: number;
+    overlapping: number;
+  };
+}
+
+interface ConflictData {
+  summary: ConflictSummary;
+  patterns: ConflictPattern[];
+}
+
+interface Recommendation {
+  id: string;
+  taskId: string | null;
+  type: string;
+  reason: string;
+  suggestion: string;
+  suggestedChange: unknown;
+  priority: string;
+  status: string;
+  task?: {
+    id: string;
+    name: string;
+    type: string;
+    category: string | null;
+  };
+}
+
 interface InsightsData {
   patterns: {
     userId: string;
@@ -89,10 +136,68 @@ export function InsightsDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [generatingRecs, setGeneratingRecs] = useState(false);
 
   useEffect(() => {
     fetchInsights();
+    fetchConflicts();
+    fetchRecommendations();
   }, []);
+
+  const fetchConflicts = async () => {
+    try {
+      const response = await fetch("/api/insights/conflicts?weeks=4");
+      if (response.ok) {
+        const result = await response.json();
+        setConflictData(result);
+      }
+    } catch (err) {
+      console.error("Failed to fetch conflicts:", err);
+    }
+  };
+
+  const fetchRecommendations = async () => {
+    try {
+      const response = await fetch("/api/recommendations?location=insights");
+      if (response.ok) {
+        const result = await response.json();
+        setRecommendations(result);
+      }
+    } catch (err) {
+      console.error("Failed to fetch recommendations:", err);
+    }
+  };
+
+  const generateRecommendations = async () => {
+    setGeneratingRecs(true);
+    try {
+      const response = await fetch("/api/recommendations/generate", { method: "POST" });
+      if (response.ok) {
+        await fetchRecommendations();
+      }
+    } catch (err) {
+      console.error("Failed to generate recommendations:", err);
+    } finally {
+      setGeneratingRecs(false);
+    }
+  };
+
+  const handleRecommendationAction = async (id: string, status: "accepted" | "dismissed", applyChanges = false) => {
+    try {
+      const response = await fetch(`/api/recommendations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, applyChanges }),
+      });
+      if (response.ok) {
+        setRecommendations(recommendations.filter((r) => r.id !== id));
+      }
+    } catch (err) {
+      console.error("Failed to update recommendation:", err);
+    }
+  };
 
   const fetchInsights = async (refresh = false) => {
     try {
@@ -234,6 +339,177 @@ export function InsightsDashboard() {
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Recommendations */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              AI Recommendations
+            </CardTitle>
+            <CardDescription>Suggestions based on your scheduling patterns</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateRecommendations}
+            disabled={generatingRecs}
+          >
+            {generatingRecs ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Analyze Patterns
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {recommendations.length > 0 ? (
+            <div className="space-y-3">
+              {recommendations.map((rec) => (
+                <div
+                  key={rec.id}
+                  className={`p-4 rounded-lg border ${
+                    rec.priority === "high" ? "border-orange-200 bg-orange-50" : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {rec.type === "general" ? (
+                          <Lightbulb className="h-4 w-4 text-yellow-500" />
+                        ) : rec.type === "change_time" ? (
+                          <Clock className="h-4 w-4 text-blue-500" />
+                        ) : rec.type === "change_days" ? (
+                          <Calendar className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        )}
+                        {rec.task && (
+                          <span className="text-sm font-medium text-gray-700">{rec.task.name}</span>
+                        )}
+                        {rec.priority === "high" && (
+                          <span className="text-xs px-2 py-0.5 bg-orange-200 text-orange-700 rounded-full">
+                            High Priority
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">{rec.reason}</p>
+                      <p className="text-sm font-medium">{rec.suggestion}</p>
+                    </div>
+                    {rec.type !== "general" && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRecommendationAction(rec.id, "accepted", true)}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Apply
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRecommendationAction(rec.id, "dismissed")}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-500">
+              <Sparkles className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <p>No recommendations yet.</p>
+              <p className="text-sm">Click "Analyze Patterns" to generate suggestions based on your scheduling history.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Conflict Report */}
+      {conflictData && conflictData.summary.totalConflicts > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Schedule Conflicts
+            </CardTitle>
+            <CardDescription>Tasks you've manually rescheduled in the last 4 weeks</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-orange-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {conflictData.summary.totalConflicts}
+                </div>
+                <div className="text-xs text-gray-500">Total Reschedules</div>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {conflictData.summary.conflictsThisWeek}
+                </div>
+                <div className="text-xs text-gray-500">This Week</div>
+              </div>
+              <div className="p-3 bg-yellow-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {conflictData.summary.resolutionTypes.shortened}
+                </div>
+                <div className="text-xs text-gray-500">Tasks Shortened</div>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {conflictData.summary.resolutionTypes.displaced}
+                </div>
+                <div className="text-xs text-gray-500">Tasks Displaced</div>
+              </div>
+            </div>
+
+            {/* Most rescheduled tasks */}
+            {conflictData.summary.mostRescheduledTasks.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Most Rescheduled Tasks</h4>
+                <div className="space-y-2">
+                  {conflictData.summary.mostRescheduledTasks.map((task) => (
+                    <div
+                      key={task.taskId}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            task.taskType === "resolution" ? "bg-blue-500" : "bg-green-500"
+                          }`}
+                        />
+                        <span className="font-medium">{task.taskName}</span>
+                        {task.taskCategory && (
+                          <span className="text-xs text-gray-500">({task.taskCategory})</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-orange-600 font-medium">
+                          {task.totalMoves} moves
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-gray-400" />
+                        <span className="text-xs text-gray-500">
+                          ~{task.averageMovesPerWeek.toFixed(1)}/week
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

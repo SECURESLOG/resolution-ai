@@ -6,6 +6,8 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
+const DAYS_OF_WEEK = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+
 const updateTaskSchema = z.object({
   name: z.string().min(1).optional(),
   type: z.enum(["resolution", "household"]).optional(),
@@ -13,6 +15,23 @@ const updateTaskSchema = z.object({
   isFlexible: z.boolean().optional(),
   category: z.string().optional(),
   priority: z.number().min(1).max(4).optional(),
+
+  // Scheduling mode
+  schedulingMode: z.enum(["fixed", "flexible"]).optional(),
+
+  // Fixed schedule settings
+  fixedDays: z.array(z.enum(DAYS_OF_WEEK)).optional(),
+  fixedTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+
+  // Flexible schedule settings
+  frequency: z.number().min(1).max(14).optional(),
+  frequencyPeriod: z.enum(["day", "week"]).optional(),
+  requiredDays: z.array(z.enum(DAYS_OF_WEEK)).optional(),
+  preferredDays: z.array(z.enum(DAYS_OF_WEEK)).optional(),
+  preferredTimeStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+  preferredTimeEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+  minDuration: z.number().min(5).optional().nullable(),
+  maxDuration: z.number().min(5).optional().nullable(),
 });
 
 export async function GET(

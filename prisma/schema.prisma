@@ -125,16 +125,36 @@ model Task {
   familyId   String?
   name       String
   type       String   // "resolution" or "household"
-  duration   Int      // in minutes
+  duration   Int      // in minutes (default/max duration for flexible tasks)
   isFlexible Boolean  @default(true)
   category   String?
   priority   Int      @default(3) // 1-4, lower is higher priority
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  family         Family?         @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  scheduledTasks ScheduledTask[]
+  // Scheduling mode: "fixed" or "flexible"
+  schedulingMode      String   @default("flexible")
+
+  // Fixed schedule settings (for schedulingMode = "fixed")
+  fixedDays           String[] // ["monday", "wednesday", "friday"]
+  fixedTime           String?  // "15:00" (24hr format)
+
+  // Flexible schedule settings (for schedulingMode = "flexible")
+  frequency           Int?     @default(1) // times per period
+  frequencyPeriod     String?  @default("week") // "day" or "week"
+  requiredDays        String[] // Must be scheduled on one of these days (e.g., class only offered Tue/Thu)
+  preferredDays       String[] // Soft preference for these days
+  preferredTimeStart  String?  // "17:00" - start of preferred window
+  preferredTimeEnd    String?  // "21:00" - end of preferred window
+  minDuration         Int?     // Minimum duration in minutes (for flexible duration)
+  maxDuration         Int?     // Maximum duration in minutes (for flexible duration)
+
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family            Family?            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  scheduledTasks    ScheduledTask[]
+  conflicts         ScheduleConflict[] @relation("ConflictTask")
+  displacedBy       ScheduleConflict[] @relation("DisplacedTask")
+  recommendations   AIRecommendation[]
 }
 
 model ScheduledTask {
@@ -150,9 +170,26 @@ model ScheduledTask {
   aiReasoning         String?  @db.Text
   createdAt           DateTime @default(now())
 
+  // Manual move tracking
+  wasManuallyMoved    Boolean  @default(false)
+  originalStartTime   DateTime? // Original time before manual move
+  originalEndTime     DateTime? // Original end time before manual move
+  movedAt             DateTime? // When it was manually moved
+  movedBy             String?   // UserId who moved it
+  moveReason          String?   // Optional reason for the move
+
+  // Partial overlap tracking (when task is shortened due to conflict)
+  wasShortened        Boolean  @default(false)
+  originalDuration    Int?     // Original duration before shortening
+
   task       Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   assignedTo User       @relation(fields: [assignedToUserId], references: [id], onDelete: Cascade)
   feedback   Feedback[]
+
+  // Conflicts where this task was moved
+  conflictsAsMoved     ScheduleConflict[] @relation("MovedTask")
+  // Conflicts where this task was displaced
+  conflictsAsDisplaced ScheduleConflict[] @relation("DisplacedScheduledTask")
 }
 
 model Feedback {
@@ -312,6 +349,70 @@ model WeeklyPlanItem {
   weeklyPlan WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
 
   @@index([weeklyPlanId])
+}
+
+// Track scheduling conflicts introduced by user manual moves
+model ScheduleConflict {
+  id                    String   @id @default(cuid())
+  userId                String   // User who caused the conflict
+  weekOf                DateTime // Start of week for reporting
+
+  // The task that was moved
+  movedScheduledTaskId  String
+  movedTaskId           String
+
+  // The task that was displaced/affected (null if just shortened)
+  displacedScheduledTaskId String?
+  displacedTaskId       String?
+
+  // Timing details
+  originalStartTime     DateTime
+  originalEndTime       DateTime
+  newStartTime          DateTime
+  newEndTime            DateTime
+
+  // What happened to the displaced task
+  resolutionType        String   // "displaced", "shortened", "overlapping"
+  displacedTaskNewStart DateTime?
+  displacedTaskNewEnd   DateTime?
+
+  // User interaction
+  userAccepted          Boolean  @default(true) // User acknowledged the conflict
+  createdAt             DateTime @default(now())
+
+  movedScheduledTask    ScheduledTask  @relation("MovedTask", fields: [movedScheduledTaskId], references: [id], onDelete: Cascade)
+  movedTask             Task           @relation("ConflictTask", fields: [movedTaskId], references: [id], onDelete: Cascade)
+  displacedScheduledTask ScheduledTask? @relation("DisplacedScheduledTask", fields: [displacedScheduledTaskId], references: [id], onDelete: SetNull)
+  displacedTask         Task?          @relation("DisplacedTask", fields: [displacedTaskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, weekOf])
+  @@index([movedTaskId])
+}
+
+// AI-generated recommendations based on conflict patterns
+model AIRecommendation {
+  id              String   @id @default(cuid())
+  userId          String
+  taskId          String?  // Related task (if applicable)
+
+  type            String   // "reschedule", "reduce_frequency", "change_time", "change_days", "general"
+  reason          String   @db.Text // "You rescheduled Gym 4 times last week"
+  suggestion      String   @db.Text // Human-readable suggestion
+  suggestedChange Json?    // Structured change data
+
+  // For display context
+  priority        String   @default("normal") // "low", "normal", "high"
+  displayLocation String   @default("weekly_plan") // "weekly_plan", "tasks", "insights", "dashboard"
+
+  status          String   @default("pending") // "pending", "accepted", "dismissed", "expired"
+  respondedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([displayLocation, status])
 }
 
 // Notification queue for reminders and agent messages

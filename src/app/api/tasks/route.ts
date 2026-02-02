@@ -6,6 +6,8 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
+const DAYS_OF_WEEK = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+
 const createTaskSchema = z.object({
   name: z.string().min(1, "Task name is required"),
   type: z.enum(["resolution", "household"]),
@@ -13,6 +15,23 @@ const createTaskSchema = z.object({
   isFlexible: z.boolean().default(true),
   category: z.string().optional(),
   priority: z.number().min(1).max(4).default(3),
+
+  // Scheduling mode
+  schedulingMode: z.enum(["fixed", "flexible"]).default("flexible"),
+
+  // Fixed schedule settings
+  fixedDays: z.array(z.enum(DAYS_OF_WEEK)).optional().default([]),
+  fixedTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+
+  // Flexible schedule settings
+  frequency: z.number().min(1).max(14).optional().default(1),
+  frequencyPeriod: z.enum(["day", "week"]).optional().default("week"),
+  requiredDays: z.array(z.enum(DAYS_OF_WEEK)).optional().default([]),
+  preferredDays: z.array(z.enum(DAYS_OF_WEEK)).optional().default([]),
+  preferredTimeStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+  preferredTimeEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().nullable(),
+  minDuration: z.number().min(5).optional().nullable(),
+  maxDuration: z.number().min(5).optional().nullable(),
 });
 
 export async function GET() {
@@ -56,10 +75,37 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createTaskSchema.parse(body);
 
+    // Extract fields for Prisma create
+    const {
+      schedulingMode,
+      fixedDays,
+      fixedTime,
+      frequency,
+      frequencyPeriod,
+      requiredDays,
+      preferredDays,
+      preferredTimeStart,
+      preferredTimeEnd,
+      minDuration,
+      maxDuration,
+      ...baseData
+    } = validatedData;
+
     const task = await prisma.task.create({
       data: {
-        ...validatedData,
+        ...baseData,
         userId: session.user.id,
+        schedulingMode,
+        fixedDays: fixedDays || [],
+        fixedTime: fixedTime || null,
+        frequency: frequency || 1,
+        frequencyPeriod: frequencyPeriod || "week",
+        requiredDays: requiredDays || [],
+        preferredDays: preferredDays || [],
+        preferredTimeStart: preferredTimeStart || null,
+        preferredTimeEnd: preferredTimeEnd || null,
+        minDuration: minDuration || null,
+        maxDuration: maxDuration || null,
       },
     });
 
