@@ -11,6 +11,8 @@ import {
 } from "@/lib/agent-tools";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { opikClient, flushOpik } from "@/lib/opik";
+import { evaluateCoachingStyle } from "@/lib/opik-evaluators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow up to 60 seconds for agent responses
@@ -154,6 +156,10 @@ You can help users with:
 }
 
 export async function POST(request: NextRequest) {
+  // Generate a session ID for tracing
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  let trace: ReturnType<typeof opikClient.trace> | null = null;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -163,6 +169,22 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { message, conversationHistory, pageContext } = chatRequestSchema.parse(body);
+
+    // Start Opik trace for this conversation
+    trace = opikClient.trace({
+      name: "agent:chat",
+      input: {
+        userMessage: message,
+        pageContext: pageContext?.page || "unknown",
+        historyLength: conversationHistory?.length || 0,
+      },
+      metadata: {
+        feature: "agent_chat",
+        userId: session.user.id,
+        sessionId,
+        page: pageContext?.page,
+      },
+    });
 
     // Get user context
     const user = await prisma.user.findUnique({
@@ -212,13 +234,35 @@ export async function POST(request: NextRequest) {
       pageContext
     );
 
+    // Track LLM call with Opik span
+    const llmSpan = trace.span({
+      name: "llm_call_initial",
+      type: "llm",
+      input: { messageCount: apiMessages.length },
+      metadata: { model: "claude-sonnet-4-20250514" },
+    });
+
     // Call Claude with tools (using raw fetch to avoid SDK Zod validation issues)
     let response = await callAnthropic(systemPrompt, apiMessages, toolsWithContext);
+
+    llmSpan.update({
+      output: {
+        stopReason: response.stop_reason,
+        contentBlocks: response.content.length,
+      },
+      metadata: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      },
+    });
+    llmSpan.end();
 
     // Process tool calls in a loop until we get a final response
     const toolResults: { toolName: string; input: unknown; output: unknown }[] = [];
     let iterations = 0;
     const maxIterations = 10;
+    let totalInputTokens = response.usage.input_tokens;
+    let totalOutputTokens = response.usage.output_tokens;
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -232,6 +276,14 @@ export async function POST(request: NextRequest) {
       const toolResultContents: Array<{ type: "tool_result"; tool_use_id: string; content: string }> = [];
 
       for (const toolUse of toolUseBlocks) {
+        // Track tool execution with Opik span
+        const toolSpan = trace.span({
+          name: `tool:${toolUse.name}`,
+          type: "tool",
+          input: { toolName: toolUse.name, rawInput: toolUse.input },
+          metadata: { iteration: iterations },
+        });
+
         // Ensure input is an object (Claude sometimes sends null)
         const rawInput = (toolUse.input ?? {}) as Record<string, unknown>;
 
@@ -244,6 +296,11 @@ export async function POST(request: NextRequest) {
         );
 
         const result = await safeExecuteTool(toolUse.name, toolInput);
+
+        toolSpan.update({
+          output: { success: !("error" in result), result },
+        });
+        toolSpan.end();
 
         toolResults.push({
           toolName: toolUse.name,
@@ -269,8 +326,28 @@ export async function POST(request: NextRequest) {
         content: toolResultContents,
       });
 
+      // Track follow-up LLM call
+      const followUpSpan = trace.span({
+        name: `llm_call_iteration_${iterations}`,
+        type: "llm",
+        input: { messageCount: apiMessages.length },
+        metadata: { model: "claude-sonnet-4-20250514", iteration: iterations },
+      });
+
       // Get next response
       response = await callAnthropic(systemPrompt, apiMessages, toolsWithContext);
+
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
+
+      followUpSpan.update({
+        output: { stopReason: response.stop_reason },
+        metadata: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+      });
+      followUpSpan.end();
     }
 
     // Extract the final text response
@@ -280,12 +357,65 @@ export async function POST(request: NextRequest) {
 
     const assistantMessage = textBlocks.map((block) => block.text).join("\n");
 
+    // Add summary scores to trace
+    trace.score({
+      name: "tool_count",
+      value: toolResults.length / 10, // Normalize to 0-1 (10 tools = 1.0)
+      reason: `Used ${toolResults.length} tools in ${iterations} iterations`,
+    });
+
+    trace.score({
+      name: "efficiency",
+      value: Math.max(0, 1 - (iterations / maxIterations)),
+      reason: `Completed in ${iterations} iterations (max: ${maxIterations})`,
+    });
+
+    // Update trace with final output
+    trace.update({
+      output: {
+        assistantMessage: assistantMessage.slice(0, 500), // Truncate for storage
+        toolsUsed: toolResults.map((r) => r.toolName),
+        iterations,
+        totalTokens: totalInputTokens + totalOutputTokens,
+      },
+      metadata: {
+        totalInputTokens,
+        totalOutputTokens,
+        toolCount: toolResults.length,
+      },
+    });
+
+    trace.end();
+
+    // Run coaching style evaluation asynchronously (don't block response)
+    evaluateCoachingStyle({
+      userId: session.user.id,
+      sessionId,
+      userMessage: message,
+      aiResponse: assistantMessage,
+      context: pageContext?.page || "general",
+    }).catch((err) => console.error("Coaching evaluation failed:", err));
+
+    // Flush Opik traces
+    await flushOpik();
+
     return NextResponse.json({
       message: assistantMessage,
       toolsUsed: toolResults.map((r) => r.toolName),
       toolResults: toolResults.length > 0 ? toolResults : undefined,
     });
   } catch (error) {
+    // Log error in trace if it exists
+    if (trace) {
+      trace.update({
+        metadata: {
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+      });
+      trace.end();
+      await flushOpik();
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
