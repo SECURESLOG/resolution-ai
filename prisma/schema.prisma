@@ -47,18 +47,19 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  accounts          Account[]
-  sessions          Session[]
-  tasks             Task[]
-  scheduledTasks    ScheduledTask[]
-  feedback          Feedback[]
-  learningData      LearningData[]
-  progress          ProgressTracking[]
-  familyMember      FamilyMember?
-  externalCalendars ExternalCalendar[]
-  addinTokens       AddinToken[]
-  userPreferences   UserPreference[]
-  notifications     Notification[]
+  accounts             Account[]
+  sessions             Session[]
+  tasks                Task[]
+  scheduledTasks       ScheduledTask[]
+  feedback             Feedback[]
+  learningData         LearningData[]
+  progress             ProgressTracking[]
+  familyMember         FamilyMember?
+  externalCalendars    ExternalCalendar[]
+  addinTokens          AddinToken[]
+  userPreferences      UserPreference[]
+  notifications        Notification[]
+  weeklyPlanApprovals  WeeklyPlanApproval[]
 }
 
 model ExternalCalendar {
@@ -105,6 +106,7 @@ model Family {
   members      FamilyMember[]
   tasks        Task[]
   agentMemory  AgentMemory[]
+  weeklyPlans  WeeklyPlan[]
 }
 
 model FamilyMember {
@@ -245,6 +247,71 @@ model AgentMemory {
 
   @@index([familyId, agentType])
   @@index([expiresAt])
+}
+
+// Weekly Plan - AI-generated schedule drafts for approval
+model WeeklyPlan {
+  id          String   @id @default(cuid())
+  familyId    String
+  weekStart   DateTime // Start of the week (Monday)
+  weekEnd     DateTime // End of the week (Sunday)
+  status      String   @default("draft") // "draft", "pending_approval", "approved", "rejected", "expired"
+  aiReasoning String?  @db.Text // Why the AI made these choices
+  createdBy   String   @default("system") // "system" for cron, userId for manual
+  approvedBy  String?  // Deprecated: use approvals relation instead
+  approvedAt  DateTime? // When fully approved (all members)
+  rejectedAt  DateTime?
+  expiresAt   DateTime // Auto-expire if not acted upon
+  createdAt   DateTime @default(now())
+
+  family    Family               @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  items     WeeklyPlanItem[]
+  approvals WeeklyPlanApproval[]
+
+  @@unique([familyId, weekStart])
+  @@index([status, expiresAt])
+}
+
+// Track individual member approvals for a weekly plan
+model WeeklyPlanApproval {
+  id           String   @id @default(cuid())
+  weeklyPlanId String
+  userId       String
+  status       String   @default("pending") // "pending", "approved", "rejected"
+  approvedAt   DateTime?
+  rejectedAt   DateTime?
+  comment      String?  @db.Text // Optional feedback on the plan
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  weeklyPlan WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([weeklyPlanId, userId])
+  @@index([weeklyPlanId])
+}
+
+// Individual items in a weekly plan
+model WeeklyPlanItem {
+  id               String   @id @default(cuid())
+  weeklyPlanId     String
+  taskId           String
+  assignedToUserId String
+  scheduledDate    DateTime
+  startTime        DateTime
+  endTime          DateTime
+  aiReasoning      String?  @db.Text // Why this specific time was chosen
+  createdAt        DateTime @default(now())
+
+  // Edit tracking for conflict detection
+  version          Int      @default(1)
+  lastEditedBy     String?  // userId who last edited
+  lastEditedAt     DateTime?
+  editHistory      Json?    // Array of previous edits for audit trail
+
+  weeklyPlan WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+
+  @@index([weeklyPlanId])
 }
 
 // Notification queue for reminders and agent messages

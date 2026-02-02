@@ -167,6 +167,34 @@ export async function getWeeksTasks(userId: string): Promise<ScheduledTaskWithDe
 }
 
 /**
+ * Get tomorrow's scheduled tasks for a user
+ */
+export async function getTomorrowsTasks(userId: string): Promise<ScheduledTaskWithDetails[]> {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return getScheduledTasks({
+    userId,
+    startDate: startOfDay(tomorrow),
+    endDate: endOfDay(tomorrow),
+  });
+}
+
+/**
+ * Get scheduled tasks for a family member by their userId
+ */
+export async function getFamilyMemberTasks(
+  familyMemberUserId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<ScheduledTaskWithDetails[]> {
+  return getScheduledTasks({
+    userId: familyMemberUserId,
+    startDate,
+    endDate,
+  });
+}
+
+/**
  * Get tasks that haven't been scheduled yet
  */
 export async function getUnscheduledTasks(

@@ -30,63 +30,59 @@ export const AGENT_TOOL_DEFINITIONS = [
   {
     name: "get_calendar_events",
     description:
-      "Get all calendar events for a user within a date range. Combines Google Calendar and external ICS calendars.",
+      "Get all calendar events for the current user within a date range. Combines Google Calendar and external ICS calendars. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
-        startDate: { type: "string", description: "Start date in ISO format" },
-        endDate: { type: "string", description: "End date in ISO format" },
+        startDate: { type: "string", description: "Start date in ISO format (e.g., 2026-02-02)" },
+        endDate: { type: "string", description: "End date in ISO format (e.g., 2026-02-02)" },
       },
-      required: ["userId", "startDate", "endDate"],
+      required: ["startDate", "endDate"],
     },
   },
   {
     name: "find_free_time_slots",
     description:
-      "Find available time slots in a user's calendar for a given day.",
+      "Find available time slots in a user's calendar for a given day. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
-        date: { type: "string", description: "Date in ISO format" },
+        date: { type: "string", description: "Date in ISO format (e.g., 2026-02-02)" },
         minDurationMinutes: {
           type: "number",
-          description: "Minimum duration of free slot in minutes",
+          description: "Minimum duration of free slot in minutes (default: 30)",
         },
       },
-      required: ["userId", "date"],
+      required: ["date"],
     },
   },
   {
     name: "get_calendar_density",
     description:
-      "Get how busy a user's calendar is for a given day (0-1 score).",
+      "Get how busy the current user's calendar is for a given day (0-1 score). User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
-        date: { type: "string", description: "Date in ISO format" },
+        date: { type: "string", description: "Date in ISO format (e.g., 2026-02-02)" },
       },
-      required: ["userId", "date"],
+      required: ["date"],
     },
   },
 
   // Task Tools
   {
     name: "get_user_tasks",
-    description: "Get all task definitions for a user.",
+    description: "Get all task definitions for the current user. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         type: {
           type: "string",
           enum: ["resolution", "household"],
-          description: "Filter by task type",
+          description: "Filter by task type (optional)",
         },
       },
-      required: ["userId"],
+      required: [],
     },
   },
   {
@@ -109,15 +105,54 @@ export const AGENT_TOOL_DEFINITIONS = [
     },
   },
   {
-    name: "get_unscheduled_tasks",
-    description: "Get tasks that haven't been scheduled in the upcoming period.",
+    name: "get_todays_tasks",
+    description: "Get all scheduled tasks for today. Use this when user asks about today's tasks or schedule. No parameters needed - user ID is automatically determined.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_weeks_tasks",
+    description: "Get all scheduled tasks for this week. Use this when user asks about this week's tasks or schedule. No parameters needed - user ID is automatically determined.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_tomorrows_tasks",
+    description: "Get all scheduled tasks for tomorrow. Use this when user asks about tomorrow's tasks or schedule. No parameters needed - user ID is automatically determined.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_family_member_tasks",
+    description: "Get scheduled tasks for a specific family member. Use this when user asks about another family member's tasks. First use get_family_info to get the family member's userId.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
-        lookAheadDays: { type: "number", description: "Number of days to look ahead" },
+        familyMemberUserId: { type: "string", description: "The family member's user ID (get this from get_family_info)" },
+        startDate: { type: "string", description: "Start date in ISO format (e.g., 2026-02-01)" },
+        endDate: { type: "string", description: "End date in ISO format (e.g., 2026-02-01)" },
       },
-      required: ["userId"],
+      required: ["familyMemberUserId", "startDate", "endDate"],
+    },
+  },
+  {
+    name: "get_unscheduled_tasks",
+    description: "Get tasks that haven't been scheduled in the upcoming period. User ID is automatically determined.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        lookAheadDays: { type: "number", description: "Number of days to look ahead (default: 7)" },
+      },
+      required: [],
     },
   },
   {
@@ -152,96 +187,86 @@ export const AGENT_TOOL_DEFINITIONS = [
   },
   {
     name: "check_for_conflicts",
-    description: "Check if a proposed time slot conflicts with existing scheduled tasks.",
+    description: "Check if a proposed time slot conflicts with existing scheduled tasks. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         startTime: { type: "string", description: "Proposed start time in ISO format" },
         endTime: { type: "string", description: "Proposed end time in ISO format" },
       },
-      required: ["userId", "startTime", "endTime"],
+      required: ["startTime", "endTime"],
     },
   },
 
   // Family Tools
   {
     name: "get_family_info",
-    description: "Get information about a user's family, including all members.",
+    description: "Get information about the current user's family, including all members. No parameters needed - user ID is automatically determined.",
     input_schema: {
       type: "object" as const,
-      properties: {
-        userId: { type: "string", description: "The user ID" },
-      },
-      required: ["userId"],
+      properties: {},
+      required: [],
     },
   },
   {
     name: "analyze_task_fairness",
     description:
-      "Analyze how fairly household tasks are distributed between family members.",
+      "Analyze how fairly household tasks are distributed between family members. Family ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        familyId: { type: "string", description: "The family ID" },
-        weeksToAnalyze: { type: "number", description: "Number of weeks to analyze" },
+        weeksToAnalyze: { type: "number", description: "Number of weeks to analyze (default: 4)" },
       },
-      required: ["familyId"],
+      required: [],
     },
   },
   {
     name: "suggest_task_assignment",
     description:
-      "Suggest which family member should be assigned a task based on fairness.",
+      "Suggest which family member should be assigned a task based on fairness. Family ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        familyId: { type: "string", description: "The family ID" },
         taskType: {
           type: "string",
           enum: ["resolution", "household"],
           description: "Type of task to assign",
         },
       },
-      required: ["familyId", "taskType"],
+      required: ["taskType"],
     },
   },
 
   // Preference Tools
   {
     name: "get_user_preferences",
-    description: "Get all learned preferences for a user.",
+    description: "Get all learned preferences for the current user. No parameters needed - user ID is automatically determined.",
     input_schema: {
       type: "object" as const,
-      properties: {
-        userId: { type: "string", description: "The user ID" },
-      },
-      required: ["userId"],
+      properties: {},
+      required: [],
     },
   },
   {
     name: "get_scheduling_context",
     description:
-      "Get user preferences formatted for scheduling decisions (buffer time, energy hours, etc).",
+      "Get user preferences formatted for scheduling decisions (buffer time, energy hours, etc). No parameters needed - user ID is automatically determined.",
     input_schema: {
       type: "object" as const,
-      properties: {
-        userId: { type: "string", description: "The user ID" },
-      },
-      required: ["userId"],
+      properties: {},
+      required: [],
     },
   },
   {
     name: "get_preferred_time_slots",
-    description: "Get the user's preferred time slots for a specific task type.",
+    description: "Get the user's preferred time slots for a specific task type. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         taskType: { type: "string", description: "The task type (e.g., 'resolution', 'household')" },
         category: { type: "string", description: "Optional task category" },
       },
-      required: ["userId", "taskType"],
+      required: ["taskType"],
     },
   },
 
@@ -292,29 +317,27 @@ export const AGENT_TOOL_DEFINITIONS = [
   // Notification Tools
   {
     name: "create_reminder",
-    description: "Create a reminder notification for a task.",
+    description: "Create a reminder notification for a task. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         taskName: { type: "string", description: "Name of the task" },
         scheduledTaskId: { type: "string", description: "The scheduled task ID" },
         startTime: { type: "string", description: "Task start time in ISO format" },
         reminderMinutesBefore: {
           type: "number",
-          description: "Minutes before task to send reminder",
+          description: "Minutes before task to send reminder (default: 15)",
         },
       },
-      required: ["userId", "taskName", "scheduledTaskId", "startTime"],
+      required: ["taskName", "scheduledTaskId", "startTime"],
     },
   },
   {
     name: "create_smart_reminder",
-    description: "Create a context-aware reminder with traffic/weather info.",
+    description: "Create a context-aware reminder with traffic/weather info. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         taskName: { type: "string", description: "Name of the task" },
         scheduledTaskId: { type: "string", description: "The scheduled task ID" },
         startTime: { type: "string", description: "Task start time in ISO format" },
@@ -322,20 +345,19 @@ export const AGENT_TOOL_DEFINITIONS = [
         weatherWarning: { type: "string", description: "Weather warning message" },
         preparationTip: { type: "string", description: "Preparation tip" },
       },
-      required: ["userId", "taskName", "scheduledTaskId", "startTime"],
+      required: ["taskName", "scheduledTaskId", "startTime"],
     },
   },
   {
     name: "create_conflict_notification",
-    description: "Notify user about a scheduling conflict.",
+    description: "Notify user about a scheduling conflict. User ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {
-        userId: { type: "string", description: "The user ID" },
         conflictDescription: { type: "string", description: "Description of the conflict" },
         suggestedResolution: { type: "string", description: "Suggested way to resolve" },
       },
-      required: ["userId", "conflictDescription"],
+      required: ["conflictDescription"],
     },
   },
 ];
@@ -381,6 +403,18 @@ export async function executeTool(
         endDate: new Date(args.endDate as string),
         status: args.status as "pending" | "completed" | "skipped" | undefined,
       });
+    case "get_todays_tasks":
+      return taskTools.getTodaysTasks(args.userId as string);
+    case "get_weeks_tasks":
+      return taskTools.getWeeksTasks(args.userId as string);
+    case "get_tomorrows_tasks":
+      return taskTools.getTomorrowsTasks(args.userId as string);
+    case "get_family_member_tasks":
+      return taskTools.getFamilyMemberTasks(
+        args.familyMemberUserId as string,
+        new Date(args.startDate as string),
+        new Date(args.endDate as string)
+      );
     case "get_unscheduled_tasks":
       return taskTools.getUnscheduledTasks(
         args.userId as string,
@@ -501,13 +535,17 @@ export interface ToolResult {
  */
 export async function safeExecuteTool(
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown> | null | undefined
 ): Promise<ToolResult> {
   try {
-    const data = await executeTool(toolName, args);
+    // Ensure args is always an object
+    const safeArgs = args ?? {};
+
+    const data = await executeTool(toolName, safeArgs);
     return { success: true, data };
   } catch (error) {
     console.error(`Tool execution error (${toolName}):`, error);
+    console.error(`Tool args:`, JSON.stringify(args));
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

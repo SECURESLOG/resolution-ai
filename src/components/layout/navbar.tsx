@@ -11,8 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles } from "lucide-react";
+import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles, CalendarDays, Lightbulb } from "lucide-react";
 import { useState } from "react";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -24,6 +25,8 @@ export function Navbar() {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tasks", label: "Tasks", icon: CheckSquare },
     { href: "/calendar", label: "Calendar", icon: Calendar },
+    { href: "/weekly-plan", label: "Weekly Plan", icon: CalendarDays },
+    { href: "/insights", label: "Insights", icon: Lightbulb },
     { href: "/family", label: "Family", icon: Users },
     { href: "/assistant", label: "AI Assistant", icon: Sparkles },
   ];
@@ -55,6 +58,7 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <NotificationDropdown />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">

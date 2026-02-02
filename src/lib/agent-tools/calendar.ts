@@ -28,7 +28,7 @@ interface CalendarTimeSlot {
 
 /**
  * Get all calendar events for a user within a date range
- * Combines Google Calendar events and external ICS calendar events
+ * Combines Google Calendar events, external ICS calendar events, and scheduled tasks from our app
  */
 export async function getCalendarEvents(
   userId: string,
@@ -45,10 +45,56 @@ export async function getCalendarEvents(
   const externalEvents = await getExternalCalendarEvents(userId, startDate, endDate);
   events.push(...externalEvents);
 
+  // Get scheduled tasks from our app (these are also "events" that block time)
+  const scheduledTaskEvents = await getScheduledTasksAsEvents(userId, startDate, endDate);
+  events.push(...scheduledTaskEvents);
+
   // Sort by start time
   events.sort((a, b) => a.start.getTime() - b.start.getTime());
 
   return events;
+}
+
+/**
+ * Get scheduled tasks from our app as calendar events
+ * This ensures scheduled tasks are considered when finding free time slots
+ */
+async function getScheduledTasksAsEvents(
+  userId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<CalendarEvent[]> {
+  try {
+    const scheduledTasks = await prisma.scheduledTask.findMany({
+      where: {
+        assignedToUserId: userId,
+        scheduledDate: {
+          gte: startOfDay(startDate),
+          lte: endOfDay(endDate),
+        },
+        status: { not: "skipped" }, // Don't include skipped tasks
+      },
+      include: {
+        task: {
+          select: { name: true },
+        },
+      },
+    });
+
+    return scheduledTasks.map((st) => ({
+      id: st.id,
+      summary: st.task.name,
+      description: st.aiReasoning || undefined,
+      start: new Date(st.startTime),
+      end: new Date(st.endTime),
+      isAllDay: false,
+      source: "google" as const, // Use "google" to ensure it's treated the same as other events
+      calendarName: "Scheduled Tasks",
+    }));
+  } catch (error) {
+    console.error("Error fetching scheduled tasks as events:", error);
+    return [];
+  }
 }
 
 /**

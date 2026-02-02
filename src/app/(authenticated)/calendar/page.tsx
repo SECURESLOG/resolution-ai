@@ -25,6 +25,8 @@ import {
   parseISO,
 } from "date-fns";
 import { CalendarEvent } from "@/types";
+import { TaskFeedbackModal } from "@/components/feedback/task-feedback-modal";
+import { useRegisterPageContext } from "@/contexts/AIAssistantContext";
 
 interface ScheduledTask {
   id: string;
@@ -53,6 +55,16 @@ export default function CalendarPage() {
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Feedback modal state
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
+
+  // Register page context for AI assistant
+  useRegisterPageContext("/calendar", "Calendar", {
+    tasksCount: scheduledTasks.length,
+    pendingTasks: scheduledTasks.filter((t) => t.status === "pending").length,
+  });
 
   const weekStart = useMemo(() => startOfWeek(currentWeek, { weekStartsOn: 1 }), [currentWeek]);
   const weekEnd = useMemo(() => endOfWeek(currentWeek, { weekStartsOn: 1 }), [currentWeek]);
@@ -94,18 +106,38 @@ export default function CalendarPage() {
     fetchData();
   }, [weekStart, weekEnd]);
 
-  async function updateTaskStatus(taskId: string, status: string) {
+  async function updateTaskStatus(taskId: string, status: string, showFeedback = true) {
     try {
-      await fetch(`/api/scheduled-tasks/${taskId}`, {
+      const response = await fetch(`/api/scheduled-tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
+
+      if (response.ok && status === "completed" && showFeedback) {
+        // Find the task and show feedback modal
+        const task = scheduledTasks.find(t => t.id === taskId);
+        if (task) {
+          setFeedbackTask(task);
+          setFeedbackModalOpen(true);
+        }
+      }
+
       // Trigger re-fetch by updating currentWeek to same value
       setCurrentWeek(new Date(currentWeek));
     } catch (error) {
       console.error("Error updating task:", error);
     }
+  }
+
+  function handleFeedbackClose() {
+    setFeedbackModalOpen(false);
+    setFeedbackTask(null);
+  }
+
+  function handleFeedbackSubmitted() {
+    // Refresh data after feedback
+    setCurrentWeek(new Date(currentWeek));
   }
 
   function getEventsForDay(date: Date) {
@@ -300,6 +332,18 @@ export default function CalendarPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Task Feedback Modal */}
+      {feedbackTask && (
+        <TaskFeedbackModal
+          isOpen={feedbackModalOpen}
+          onClose={handleFeedbackClose}
+          scheduledTaskId={feedbackTask.id}
+          taskName={feedbackTask.task.name}
+          estimatedDuration={feedbackTask.task.duration}
+          onFeedbackSubmitted={handleFeedbackSubmitted}
+        />
+      )}
     </div>
   );
 }

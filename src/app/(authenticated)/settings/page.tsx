@@ -32,6 +32,7 @@ import {
   Check,
   Monitor,
 } from "lucide-react";
+import { LocationSettings } from "@/components/settings/location-settings";
 
 interface CalendarProviders {
   google: boolean;
@@ -512,6 +513,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Saved Locations for Traffic */}
+      <LocationSettings />
 
       {/* About Section */}
       <Card>
