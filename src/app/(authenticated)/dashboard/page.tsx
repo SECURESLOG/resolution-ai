@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TaskFeedbackDialog } from "@/components/feedback/task-feedback-dialog";
+import { WeeklyProgress } from "@/components/dashboard/weekly-progress";
+import { DailyInsight } from "@/components/dashboard/daily-insight";
 import {
   Calendar,
   CheckCircle,
@@ -19,6 +21,7 @@ import {
   AlertCircle,
   Loader2,
   Undo2,
+  Trophy,
 } from "lucide-react";
 import { format } from "date-fns";
 import { AIScheduleResponse, ScheduleRecommendation } from "@/types";
@@ -32,6 +35,17 @@ interface Stats {
   totalTasks: number;
   resolutionTasks: number;
   householdTasks: number;
+  // New stats
+  weeklyProgress: Array<{
+    day: string;
+    date: string;
+    scheduled: number;
+    completed: number;
+    isToday: boolean;
+  }>;
+  completionRate: number;
+  resolutionRate: number;
+  topResolution: { name: string; total: number; completed: number; rate: number } | null;
 }
 
 interface ScheduledTask {
@@ -40,6 +54,7 @@ interface ScheduledTask {
   startTime: string;
   endTime: string;
   status: string;
+  streak?: number;
   task: {
     id: string;
     name: string;
@@ -254,6 +269,75 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* AI Daily Insight */}
+      <DailyInsight />
+
+      {/* Weekly Progress & Top Resolution */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {stats?.weeklyProgress && (
+          <WeeklyProgress
+            data={stats.weeklyProgress}
+            completionRate={stats.completionRate || 0}
+          />
+        )}
+
+        {/* Resolution Progress Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Resolution Progress</CardTitle>
+            <CardDescription>Your New Year&apos;s resolution performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Resolution completion rate */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">30-day completion rate</span>
+                  <span className="text-lg font-bold text-blue-600">
+                    {stats?.resolutionRate || 0}%
+                  </span>
+                </div>
+                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                    style={{ width: `${stats?.resolutionRate || 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Top resolution */}
+              {stats?.topResolution && (
+                <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Trophy className="h-4 w-4 text-yellow-600" />
+                    <span className="text-xs font-medium text-yellow-700 uppercase">
+                      Top Resolution
+                    </span>
+                  </div>
+                  <p className="font-medium text-gray-800">{stats.topResolution.name}</p>
+                  <p className="text-sm text-gray-600">
+                    {stats.topResolution.rate}% completion ({stats.topResolution.completed}/
+                    {stats.topResolution.total})
+                  </p>
+                </div>
+              )}
+
+              {!stats?.topResolution && stats?.resolutionTasks === 0 && (
+                <div className="text-center py-4">
+                  <Target className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No resolutions yet</p>
+                  <Link href="/tasks">
+                    <Button variant="link" size="sm">
+                      Add your first resolution
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* AI Schedule Result */}
       {scheduleResult && (
         <Card className="border-blue-200 bg-blue-50/50">
@@ -384,13 +468,24 @@ export default function DashboardPage() {
                         )}
                       </button>
                       <div>
-                        <p
-                          className={`font-medium ${
-                            item.status === "completed" ? "line-through text-gray-500" : ""
-                          }`}
-                        >
-                          {item.task.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p
+                            className={`font-medium ${
+                              item.status === "completed" ? "line-through text-gray-500" : ""
+                            }`}
+                          >
+                            {item.task.name}
+                          </p>
+                          {item.streak && item.streak >= 2 && (
+                            <span
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700"
+                              title={`${item.streak} completions in a row!`}
+                            >
+                              <Flame className="h-3 w-3" />
+                              {item.streak}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">
                           {format(new Date(item.startTime), "h:mm a")} -{" "}
                           {format(new Date(item.endTime), "h:mm a")}

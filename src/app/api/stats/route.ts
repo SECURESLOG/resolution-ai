@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, subDays } from "date-fns";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, subDays, format, addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +110,104 @@ export async function GET() {
       where: { userId: session.user.id, type: "household" },
     });
 
+    // Get weekly progress (completed tasks per day for the current week)
+    const weeklyProgress = [];
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekStart, i);
+      const dayStart = startOfDay(day);
+      const dayEnd = endOfDay(day);
+
+      const [scheduled, completed] = await Promise.all([
+        prisma.scheduledTask.count({
+          where: {
+            assignedToUserId: session.user.id,
+            scheduledDate: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+        prisma.scheduledTask.count({
+          where: {
+            assignedToUserId: session.user.id,
+            scheduledDate: { gte: dayStart, lte: dayEnd },
+            status: "completed",
+          },
+        }),
+      ]);
+
+      weeklyProgress.push({
+        day: format(day, "EEE"),
+        date: format(day, "MMM d"),
+        scheduled,
+        completed,
+        isToday: format(day, "yyyy-MM-dd") === format(now, "yyyy-MM-dd"),
+      });
+    }
+
+    // Calculate completion rate
+    const completionRate = weekTasks > 0 ? Math.round((completedWeek / weekTasks) * 100) : 0;
+
+    // Get resolution completion stats (last 30 days)
+    const thirtyDaysAgo = subDays(now, 30);
+    const resolutionScheduled = await prisma.scheduledTask.count({
+      where: {
+        assignedToUserId: session.user.id,
+        scheduledDate: { gte: thirtyDaysAgo },
+        task: { type: "resolution" },
+      },
+    });
+    const resolutionCompleted = await prisma.scheduledTask.count({
+      where: {
+        assignedToUserId: session.user.id,
+        scheduledDate: { gte: thirtyDaysAgo },
+        task: { type: "resolution" },
+        status: "completed",
+      },
+    });
+    const resolutionRate = resolutionScheduled > 0
+      ? Math.round((resolutionCompleted / resolutionScheduled) * 100)
+      : 0;
+
+    // Get top performing resolution (by completion rate)
+    const taskCompletionStats = await prisma.scheduledTask.groupBy({
+      by: ["taskId"],
+      where: {
+        assignedToUserId: session.user.id,
+        scheduledDate: { gte: thirtyDaysAgo },
+        task: { type: "resolution" },
+      },
+      _count: { id: true },
+    });
+
+    let topResolution = null;
+    if (taskCompletionStats.length > 0) {
+      const taskStats = await Promise.all(
+        taskCompletionStats.map(async (stat) => {
+          const task = await prisma.task.findUnique({
+            where: { id: stat.taskId },
+            select: { name: true },
+          });
+          const completed = await prisma.scheduledTask.count({
+            where: {
+              taskId: stat.taskId,
+              assignedToUserId: session.user.id,
+              scheduledDate: { gte: thirtyDaysAgo },
+              status: "completed",
+            },
+          });
+          return {
+            name: task?.name || "Unknown",
+            total: stat._count.id,
+            completed,
+            rate: stat._count.id > 0 ? Math.round((completed / stat._count.id) * 100) : 0,
+          };
+        })
+      );
+      // Sort by completion rate, then by total completed
+      taskStats.sort((a, b) => b.rate - a.rate || b.completed - a.completed);
+      if (taskStats.length > 0 && taskStats[0].completed > 0) {
+        topResolution = taskStats[0];
+      }
+    }
+
     return NextResponse.json({
       todayTasks,
       completedToday,
@@ -119,6 +217,11 @@ export async function GET() {
       totalTasks,
       resolutionTasks,
       householdTasks,
+      // New stats
+      weeklyProgress,
+      completionRate,
+      resolutionRate,
+      topResolution,
     });
   } catch (error) {
     console.error("Error fetching stats:", error);
