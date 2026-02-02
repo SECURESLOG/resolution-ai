@@ -34,6 +34,10 @@ import {
   Users,
   AlertTriangle,
   Trash2,
+  Lightbulb,
+  ArrowRight,
+  Check,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRegisterPageContext } from "@/contexts/AIAssistantContext";
@@ -101,6 +105,23 @@ interface FamilyMember {
   image: string | null;
 }
 
+interface Recommendation {
+  id: string;
+  taskId: string | null;
+  type: string;
+  reason: string;
+  suggestion: string;
+  suggestedChange: unknown;
+  priority: string;
+  status: string;
+  task?: {
+    id: string;
+    name: string;
+    type: string;
+    category: string | null;
+  };
+}
+
 export default function WeeklyPlanPage() {
   const router = useRouter();
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
@@ -122,6 +143,9 @@ export default function WeeklyPlanPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
+  // AI Recommendations
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+
   // Register page context for AI assistant
   useRegisterPageContext("/weekly-plan", "Weekly Plan", {
     planStatus: plan?.status,
@@ -131,7 +155,35 @@ export default function WeeklyPlanPage() {
 
   useEffect(() => {
     fetchPlan();
+    fetchRecommendations();
   }, []);
+
+  const fetchRecommendations = async () => {
+    try {
+      const response = await fetch("/api/recommendations?location=weekly_plan");
+      if (response.ok) {
+        const data = await response.json();
+        setRecommendations(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch recommendations:", err);
+    }
+  };
+
+  const handleRecommendationAction = async (id: string, status: "accepted" | "dismissed", applyChanges = false) => {
+    try {
+      const response = await fetch(`/api/recommendations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, applyChanges }),
+      });
+      if (response.ok) {
+        setRecommendations(recommendations.filter((r) => r.id !== id));
+      }
+    } catch (err) {
+      console.error("Failed to update recommendation:", err);
+    }
+  };
 
   const fetchPlan = async () => {
     try {
@@ -403,6 +455,77 @@ export default function WeeklyPlanPage() {
             <XCircle className="h-4 w-4" />
           </button>
         </div>
+      )}
+
+      {/* AI Recommendations */}
+      {recommendations.length > 0 && (
+        <Card className="border-purple-200 bg-purple-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Lightbulb className="h-5 w-5 text-purple-500" />
+              AI Recommendations
+            </CardTitle>
+            <CardDescription>Suggestions based on your scheduling patterns</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recommendations.slice(0, 3).map((rec) => (
+                <div
+                  key={rec.id}
+                  className={`p-3 rounded-lg border bg-white ${
+                    rec.priority === "high" ? "border-orange-200" : "border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {rec.type === "change_time" ? (
+                          <Clock className="h-4 w-4 text-blue-500" />
+                        ) : rec.type === "change_days" ? (
+                          <Calendar className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        )}
+                        {rec.task && (
+                          <span className="text-sm font-medium">{rec.task.name}</span>
+                        )}
+                        {rec.priority === "high" && (
+                          <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
+                            High Priority
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">{rec.reason}</p>
+                      <p className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-1">
+                        <ArrowRight className="h-3 w-3" />
+                        {rec.suggestion}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRecommendationAction(rec.id, "accepted", true)}
+                        className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Apply
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRecommendationAction(rec.id, "dismissed")}
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Plan Header */}
