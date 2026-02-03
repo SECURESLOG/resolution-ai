@@ -57,36 +57,48 @@ export function TaskFeedbackDialog({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setError(null);
     try {
+      const payload = {
+        scheduledTaskId,
+        actualDuration: actualDuration || undefined,
+        timeAccuracy: timeAccuracy || undefined,
+        timeSlotRating: rating || undefined,
+        wouldReschedule: wouldReschedule || undefined,
+        preferredTime: preferredTime || undefined,
+        trafficImpact: trafficImpact || undefined,
+        weatherImpact: weatherImpact || undefined,
+        energyLevel: energyLevel || undefined,
+        notes: notes || undefined,
+      };
+      console.log("Submitting feedback:", payload);
+
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scheduledTaskId,
-          actualDuration,
-          timeAccuracy,
-          timeSlotRating: rating || undefined,
-          wouldReschedule,
-          preferredTime,
-          trafficImpact: trafficImpact || undefined,
-          weatherImpact: weatherImpact || undefined,
-          energyLevel,
-          notes: notes || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
+        console.log("Feedback submitted successfully:", responseData);
         setSubmitted(true);
         setTimeout(() => {
           onOpenChange(false);
           onSubmit?.();
         }, 1500);
+      } else {
+        console.error("Feedback submission failed:", response.status, responseData);
+        setError(responseData.error || `Error ${response.status}: Failed to submit feedback`);
       }
     } catch (error) {
       console.error("Error submitting feedback:", error);
+      setError(error instanceof Error ? error.message : "Network error - please try again");
     } finally {
       setSubmitting(false);
     }
@@ -332,6 +344,13 @@ export function TaskFeedbackDialog({
             </div>
           )}
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">

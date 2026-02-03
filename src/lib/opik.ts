@@ -4,6 +4,7 @@ import { Opik } from "opik";
 // Initialize Opik client
 const opikClient = new Opik({
   apiKey: process.env.OPIK_API_KEY,
+  apiUrl: process.env.OPIK_URL_OVERRIDE || "https://www.comet.com/opik/api",
   workspaceName: process.env.OPIK_WORKSPACE || "resolution-ai",
   projectName: process.env.OPIK_PROJECT_NAME || "resolution-ai",
 });

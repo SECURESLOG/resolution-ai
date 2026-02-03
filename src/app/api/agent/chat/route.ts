@@ -250,9 +250,10 @@ export async function POST(request: NextRequest) {
         stopReason: response.stop_reason,
         contentBlocks: response.content.length,
       },
-      metadata: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+      usage: {
+        prompt_tokens: response.usage.input_tokens,
+        completion_tokens: response.usage.output_tokens,
+        total_tokens: response.usage.input_tokens + response.usage.output_tokens,
       },
     });
     llmSpan.end();
@@ -342,9 +343,10 @@ export async function POST(request: NextRequest) {
 
       followUpSpan.update({
         output: { stopReason: response.stop_reason },
-        metadata: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
+        usage: {
+          prompt_tokens: response.usage.input_tokens,
+          completion_tokens: response.usage.output_tokens,
+          total_tokens: response.usage.input_tokens + response.usage.output_tokens,
         },
       });
       followUpSpan.end();
@@ -370,6 +372,22 @@ export async function POST(request: NextRequest) {
       reason: `Completed in ${iterations} iterations (max: ${maxIterations})`,
     });
 
+    // Add a summary span with total token usage (usage is only supported on spans, not traces)
+    const summarySpan = trace.span({
+      name: "token_usage_summary",
+      type: "general",
+      input: { iterations, toolCount: toolResults.length },
+    });
+    summarySpan.update({
+      output: { totalTokens: totalInputTokens + totalOutputTokens },
+      usage: {
+        prompt_tokens: totalInputTokens,
+        completion_tokens: totalOutputTokens,
+        total_tokens: totalInputTokens + totalOutputTokens,
+      },
+    });
+    summarySpan.end();
+
     // Update trace with final output
     trace.update({
       output: {
@@ -379,9 +397,9 @@ export async function POST(request: NextRequest) {
         totalTokens: totalInputTokens + totalOutputTokens,
       },
       metadata: {
-        totalInputTokens,
-        totalOutputTokens,
         toolCount: toolResults.length,
+        prompt_tokens: totalInputTokens,
+        completion_tokens: totalOutputTokens,
       },
     });
 
