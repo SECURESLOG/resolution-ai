@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createCalendarEvent, deleteCalendarEvent } from "@/lib/calendar";
 import { z } from "zod";
-import { parseISO, parse, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { parseISO, parse, startOfWeek, endOfWeek } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +33,113 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { recommendations } = approveSchema.parse(body);
 
+    // Get all tasks to validate constraints
+    const taskIds = recommendations.map(r => r.taskId);
+    const tasks = await prisma.task.findMany({
+      where: { id: { in: taskIds } },
+    });
+
+    // Build task info map for validation
+    const dayNameToNumber: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6
+    };
+
+    const getDayNumbers = (days: unknown[] | null): number[] => {
+      if (!days || days.length === 0) return [];
+      return (days as unknown[]).map(d => {
+        if (typeof d === 'number') return d;
+        if (typeof d === 'string') return dayNameToNumber[d.toLowerCase()] ?? -1;
+        return -1;
+      }).filter(n => n >= 0);
+    };
+
+    const taskInfoMap = new Map<string, {
+      userId: string | null;
+      type: string;
+      schedulingMode: string | null;
+      fixedDays: number[];
+      fixedTime: string | null;
+      requiredDays: number[];
+    }>();
+
+    for (const task of tasks) {
+      taskInfoMap.set(task.id, {
+        userId: task.userId,
+        type: task.type,
+        schedulingMode: task.schedulingMode,
+        fixedDays: getDayNumbers(task.fixedDays as unknown[] | null),
+        fixedTime: task.fixedTime,
+        requiredDays: getDayNumbers(task.requiredDays as unknown[] | null),
+      });
+    }
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    // Validate and filter recommendations
+    const validatedRecommendations = recommendations.filter((rec) => {
+      const taskInfo = taskInfoMap.get(rec.taskId);
+      if (!taskInfo) {
+        console.warn(`FILTERED: Task ${rec.taskId} (${rec.taskName}) not found`);
+        return false;
+      }
+
+      // Parse date correctly to avoid timezone issues
+      const dateParts = rec.date.split('-');
+      const scheduledDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2])
+      );
+      const dayOfWeek = scheduledDate.getDay();
+
+      // Resolution tasks must be assigned to their owner
+      if (taskInfo.type === "resolution" && session.user.id !== taskInfo.userId) {
+        console.warn(`FILTERED: ${rec.taskName} - resolution task not owned by current user`);
+        return false;
+      }
+
+      // Validate day constraints for fixed schedules
+      if (taskInfo.schedulingMode === "fixed" && taskInfo.fixedDays.length > 0) {
+        if (!taskInfo.fixedDays.includes(dayOfWeek)) {
+          const allowedDays = taskInfo.fixedDays.map(d => dayNames[d]).join(", ");
+          console.warn(`FILTERED: ${rec.taskName} scheduled on ${dayNames[dayOfWeek]} but only allowed on: ${allowedDays}`);
+          return false;
+        }
+      }
+
+      // Also check requiredDays
+      if (taskInfo.requiredDays.length > 0) {
+        if (!taskInfo.requiredDays.includes(dayOfWeek)) {
+          const allowedDays = taskInfo.requiredDays.map(d => dayNames[d]).join(", ");
+          console.warn(`FILTERED: ${rec.taskName} scheduled on ${dayNames[dayOfWeek]} but required days are: ${allowedDays}`);
+          return false;
+        }
+      }
+
+      // Validate fixedTime constraint
+      if (taskInfo.schedulingMode === "fixed" && taskInfo.fixedTime) {
+        const [fixedHour, fixedMinute] = taskInfo.fixedTime.split(':').map(Number);
+        const [recHour, recMinute] = rec.startTime.split(':').map(Number);
+        const scheduledMinutes = recHour * 60 + recMinute;
+        const fixedMinutes = fixedHour * 60 + fixedMinute;
+        const timeDiff = Math.abs(scheduledMinutes - fixedMinutes);
+
+        if (timeDiff > 15) {
+          console.warn(`FILTERED: ${rec.taskName} scheduled at ${rec.startTime} but must be at ${taskInfo.fixedTime}`);
+          return false;
+        }
+      }
+
+      console.log(`PASSED: ${rec.taskName} on ${dayNames[dayOfWeek]}`);
+      return true;
+    });
+
+    console.log(`Validation: ${validatedRecommendations.length}/${recommendations.length} tasks passed`);
+
     // Calculate the week range from the first recommendation
-    if (recommendations.length > 0) {
-      const firstDate = parseISO(recommendations[0].date);
+    if (validatedRecommendations.length > 0) {
+      const firstDate = parseISO(validatedRecommendations[0].date);
       const weekStart = startOfWeek(firstDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(firstDate, { weekStartsOn: 1 });
 
@@ -77,8 +181,9 @@ export async function POST(request: NextRequest) {
     }
 
     const results = [];
+    const filteredCount = recommendations.length - validatedRecommendations.length;
 
-    for (const rec of recommendations) {
+    for (const rec of validatedRecommendations) {
       try {
         // Parse date and times
         const date = parseISO(rec.date);
@@ -135,9 +240,15 @@ export async function POST(request: NextRequest) {
 
     const successCount = results.filter((r) => r.success).length;
 
+    let message = `Successfully scheduled ${successCount} of ${validatedRecommendations.length} tasks`;
+    if (filteredCount > 0) {
+      message += ` (${filteredCount} tasks were filtered due to scheduling constraints)`;
+    }
+
     return NextResponse.json({
-      message: `Successfully scheduled ${successCount} of ${recommendations.length} tasks`,
+      message,
       results,
+      filteredCount,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -52,11 +52,13 @@ async function getExternalCalendarEvents(
   for (const calendar of externalCalendars) {
     try {
       const events = await fetchICSCalendar(calendar.url, startDate, endDate);
-      // Prefix event IDs to avoid collisions
+      // Prefix event IDs to avoid collisions and add source info
       const prefixedEvents = events.map((e) => ({
         ...e,
         id: `ext_${calendar.id}_${e.id}`,
-        summary: `[${calendar.name}] ${e.summary}`,
+        summary: e.summary,
+        source: "external" as const,
+        calendarName: calendar.name,
       }));
       allEvents.push(...prefixedEvents);
 
@@ -212,6 +214,8 @@ async function getMicrosoftCalendarEvents(
       date: event.isAllDay ? (event.end as { dateTime: string })?.dateTime?.split("T")[0] : undefined,
     },
     status: event.isCancelled ? "cancelled" : "confirmed",
+    source: "google" as const, // Treat Microsoft same as Google for color coding
+    calendarName: "Outlook Calendar",
   }));
 }
 
@@ -327,6 +331,8 @@ export async function getCalendarEvents(
           timeZone: event.end?.timeZone || undefined,
         },
         status: event.status || undefined,
+        source: "google" as const,
+        calendarName: "Google Calendar",
       }));
       allEvents.push(...googleEvents);
     } catch (error) {
@@ -342,10 +348,17 @@ export async function getCalendarEvents(
     console.error("Error fetching external calendars:", error);
   }
 
+  // Helper to extract time string for sorting
+  const getTimeString = (time: CalendarEvent['start']): string => {
+    if (typeof time === 'string') return time;
+    if (time instanceof Date) return time.toISOString();
+    return time.dateTime || time.date || "";
+  };
+
   // Sort all events by start time
   return allEvents.sort((a, b) => {
-    const aTime = a.start.dateTime || a.start.date || "";
-    const bTime = b.start.dateTime || b.start.date || "";
+    const aTime = getTimeString(a.start);
+    const bTime = getTimeString(b.start);
     return aTime.localeCompare(bTime);
   });
 }
@@ -417,21 +430,25 @@ export function findAvailableSlots(
   const dayEnd = new Date(date);
   dayEnd.setHours(workdayEnd, 0, 0, 0);
 
+  // Helper to extract Date from CalendarEvent start/end
+  const getEventDate = (time: CalendarEvent['start'], isEnd = false): Date => {
+    if (typeof time === 'string') return parseISO(time);
+    if (time instanceof Date) return time;
+    if (time.dateTime) return parseISO(time.dateTime);
+    // All-day event: for end date, add a day
+    const dateStr = time.date!;
+    return isEnd ? addDays(parseISO(dateStr), 1) : parseISO(dateStr);
+  };
+
   // Filter events for this day
   const dayEvents = events
     .filter((event) => {
-      const eventStart = event.start.dateTime
-        ? parseISO(event.start.dateTime)
-        : parseISO(event.start.date!);
+      const eventStart = getEventDate(event.start);
       return format(eventStart, "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
     })
     .map((event) => ({
-      start: event.start.dateTime
-        ? parseISO(event.start.dateTime)
-        : parseISO(event.start.date!),
-      end: event.end.dateTime
-        ? parseISO(event.end.dateTime)
-        : addDays(parseISO(event.end.date!), 1),
+      start: getEventDate(event.start),
+      end: getEventDate(event.end, true),
     }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 

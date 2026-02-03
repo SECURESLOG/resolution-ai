@@ -1,6 +1,15 @@
 import { CalendarEvent } from "@/types";
 import { parseISO, isWithinInterval } from "date-fns";
 
+// Helper to extract Date from CalendarEvent start/end
+function getEventDate(time: CalendarEvent['start']): Date | null {
+  if (typeof time === 'string') return parseISO(time);
+  if (time instanceof Date) return time;
+  if (time.dateTime) return parseISO(time.dateTime);
+  if (time.date) return parseISO(time.date);
+  return null;
+}
+
 /**
  * Parse ICS calendar data and extract events
  */
@@ -16,11 +25,7 @@ export function parseICSData(icsData: string, startDate: Date, endDate: Date): C
     const event = parseEventBlock(block);
     if (event) {
       // Check if event falls within date range
-      const eventStart = event.start.dateTime
-        ? parseISO(event.start.dateTime)
-        : event.start.date
-          ? parseISO(event.start.date)
-          : null;
+      const eventStart = getEventDate(event.start);
 
       if (eventStart && isWithinInterval(eventStart, { start: startDate, end: endDate })) {
         events.push(event);

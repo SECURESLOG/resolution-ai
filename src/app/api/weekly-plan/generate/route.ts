@@ -136,6 +136,137 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Helper to convert day name to number (handles both string and number formats)
+    const dayNameToNumber: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6
+    };
+    const getDayNumbers = (days: unknown[] | null): number[] => {
+      if (!days || days.length === 0) return [];
+      return days.map(d => {
+        if (typeof d === 'number') return d;
+        if (typeof d === 'string') return dayNameToNumber[d.toLowerCase()] ?? -1;
+        return -1;
+      }).filter(n => n >= 0);
+    };
+
+    // Build task info map for validation
+    const taskInfoMap = new Map<string, {
+      userId: string;
+      type: string;
+      schedulingMode: string | null;
+      fixedDays: number[];
+      fixedTime: string | null;
+      requiredDays: number[];
+    }>();
+    for (const member of familyContext.members) {
+      for (const task of member.tasks) {
+        const fixedDays = getDayNumbers(task.fixedDays as unknown[] | null);
+        const requiredDays = getDayNumbers(task.requiredDays as unknown[] | null);
+
+        console.log(`Task: ${task.name}, mode: ${task.schedulingMode}, fixedDays: [${fixedDays}], requiredDays: [${requiredDays}], fixedTime: ${task.fixedTime}`);
+
+        taskInfoMap.set(task.id, {
+          userId: member.userId,
+          type: task.type,
+          schedulingMode: task.schedulingMode,
+          fixedDays,
+          fixedTime: task.fixedTime,
+          requiredDays,
+        });
+      }
+    }
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    console.log(`\n=== AI Generated ${planResult.tasks.length} tasks ===`);
+    for (const t of planResult.tasks) {
+      console.log(`  - ${t.taskName}: ${t.scheduledDate} at ${t.startTime}`);
+    }
+
+    // Validate and filter tasks
+    const validatedTasks = planResult.tasks.filter((proposedTask) => {
+      const taskInfo = taskInfoMap.get(proposedTask.taskId);
+      if (!taskInfo) {
+        console.warn(`FILTERED: Task ${proposedTask.taskId} (${proposedTask.taskName}) not found in family tasks`);
+        return false;
+      }
+
+      // Resolution tasks must be assigned to their owner
+      if (taskInfo.type === "resolution" && proposedTask.assignedToUserId !== taskInfo.userId) {
+        console.warn(`FILTERED: ${proposedTask.taskName} - wrong owner assignment`);
+        return false;
+      }
+
+      // Parse scheduled date correctly to avoid timezone issues
+      // "YYYY-MM-DD" parsed as `new Date(str)` is UTC midnight, but getDay() uses local time
+      // So we parse year/month/day explicitly to get local date
+      const dateParts = proposedTask.scheduledDate.split('-');
+      const scheduledDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1, // Month is 0-indexed
+        parseInt(dateParts[2])
+      );
+      const dayOfWeek = scheduledDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+      console.log(`Checking ${proposedTask.taskName}: scheduled on ${dayNames[dayOfWeek]} (${dayOfWeek}), fixedDays: [${taskInfo.fixedDays}], requiredDays: [${taskInfo.requiredDays}], mode: ${taskInfo.schedulingMode}`);
+
+      if (taskInfo.schedulingMode === "fixed" && taskInfo.fixedDays.length > 0) {
+        if (!taskInfo.fixedDays.includes(dayOfWeek)) {
+          const allowedDays = taskInfo.fixedDays.map(d => dayNames[d]).join(", ");
+          console.warn(`FILTERED: ${proposedTask.taskName} scheduled on ${dayNames[dayOfWeek]} but only allowed on: ${allowedDays}`);
+          return false;
+        }
+      }
+
+      // Also check requiredDays for flexible tasks
+      if (taskInfo.requiredDays.length > 0) {
+        if (!taskInfo.requiredDays.includes(dayOfWeek)) {
+          const allowedDays = taskInfo.requiredDays.map(d => dayNames[d]).join(", ");
+          console.warn(`FILTERED: ${proposedTask.taskName} scheduled on ${dayNames[dayOfWeek]} but required days are: ${allowedDays}`);
+          return false;
+        }
+      }
+
+      // Validate fixedTime constraint
+      if (taskInfo.schedulingMode === "fixed" && taskInfo.fixedTime) {
+        // Extract time from the scheduled startTime
+        const startTimeDate = new Date(proposedTask.startTime);
+        const scheduledHour = startTimeDate.getHours();
+        const scheduledMinute = startTimeDate.getMinutes();
+        const scheduledTimeStr = `${scheduledHour.toString().padStart(2, '0')}:${scheduledMinute.toString().padStart(2, '0')}`;
+
+        // Parse the fixedTime (format: "HH:mm" like "16:30")
+        const [fixedHour, fixedMinute] = taskInfo.fixedTime.split(':').map(Number);
+        const fixedTimeStr = `${fixedHour.toString().padStart(2, '0')}:${fixedMinute.toString().padStart(2, '0')}`;
+
+        // Allow 15-minute tolerance
+        const scheduledMinutes = scheduledHour * 60 + scheduledMinute;
+        const fixedMinutes = fixedHour * 60 + fixedMinute;
+        const timeDiff = Math.abs(scheduledMinutes - fixedMinutes);
+
+        if (timeDiff > 15) {
+          console.warn(`FILTERED: ${proposedTask.taskName} scheduled at ${scheduledTimeStr} but must be at ${fixedTimeStr}`);
+          return false;
+        }
+      }
+
+      console.log(`PASSED: ${proposedTask.taskName}`);
+      return true;
+    });
+
+    console.log(`\n=== After validation: ${validatedTasks.length} tasks remain ===\n`);
+
+    if (validatedTasks.length === 0) {
+      return NextResponse.json(
+        { error: "No valid tasks after validation" },
+        { status: 500 }
+      );
+    }
+
+    // Use validated tasks
+    planResult.tasks = validatedTasks;
+
     // Store the plan
     const weeklyPlan = await prisma.weeklyPlan.create({
       data: {
@@ -225,6 +356,18 @@ async function generateWeeklyPlan(
 }> {
   const prompt = buildPlanningPrompt(context, weekStart, weekEnd);
 
+  // Log prompt for debugging
+  console.log("\n=== AI SCHEDULING PROMPT (task constraints) ===");
+  const taskLines = prompt.split('\n').filter(line =>
+    line.includes('FIXED SCHEDULE') ||
+    line.includes('Required days') ||
+    line.includes('Required time') ||
+    line.includes('- Nursery') ||
+    line.includes('schedulingMode')
+  );
+  taskLines.forEach(line => console.log(line));
+  console.log("=== END PROMPT EXCERPT ===\n");
+
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -232,18 +375,24 @@ async function generateWeeklyPlan(
       system: `You are an AI scheduling assistant for a family scheduling app. Your job is to create an optimized weekly schedule that balances everyone's tasks, respects their preferences, and avoids conflicts with existing calendar events.
 
 When creating schedules:
-1. Respect each person's learned preferences (preferred times, energy patterns)
-2. Distribute household tasks fairly between family members
-3. Schedule resolution tasks (personal goals) at optimal times for each person
-4. Avoid conflicts with existing calendar events
-5. Consider task priorities (1=highest, 4=lowest)
-6. Leave buffer time between tasks
-7. Don't over-schedule - aim for achievable plans
+1. **CRITICAL: Follow scheduling constraints EXACTLY:**
+   - Tasks marked "FIXED SCHEDULE" with required days MUST be scheduled on ALL of those days (e.g., Mon-Fri means create 5 separate entries, one for each day)
+   - "Required time" means the task MUST start at that exact time on each scheduled day
+   - Respect frequency requirements - if frequency=5 and days=Mon-Fri, create exactly 5 entries
+   - Do NOT schedule fixed tasks on days not in their required days list (e.g., NO weekends if only Mon-Fri specified)
+2. **CRITICAL: Resolution tasks (type: "resolution") MUST ONLY be assigned to their owner. NEVER assign to another family member.**
+3. Household tasks (type: "household") CAN be distributed fairly between family members
+4. Respect each person's learned preferences (preferred times, energy patterns)
+5. Avoid conflicts with existing calendar events
+6. Consider task priorities (1=highest, 4=lowest)
+7. Leave buffer time between tasks
+8. Don't over-schedule - aim for achievable plans
 
 CRITICAL: Respond with ONLY valid JSON. No markdown, no code blocks, no explanation text before or after.
 - No trailing commas after the last item in arrays or objects
 - All strings must be properly quoted
 - Keep reasoning text short (under 200 characters per task)
+- The assignedToUserId MUST match the userId of the person who owns that task
 
 JSON structure:
 {"reasoning":"Brief strategy explanation","tasks":[{"taskId":"id","taskName":"name","assignedToUserId":"userId","assignedToName":"name","scheduledDate":"YYYY-MM-DD","startTime":"YYYY-MM-DDTHH:mm:ss","endTime":"YYYY-MM-DDTHH:mm:ss","reasoning":"brief reason"}]}`,
@@ -340,9 +489,51 @@ function buildPlanningPrompt(
     } else {
       for (const task of member.tasks) {
         const priority = ["High", "Medium-High", "Medium", "Low"][task.priority - 1] || "Medium";
+
+        // Helper to format day arrays (handles both string and number formats)
+        const formatDays = (days: unknown[]): string => {
+          return days.map(d => {
+            if (typeof d === 'string') {
+              return d.charAt(0).toUpperCase() + d.slice(1); // Capitalize
+            }
+            const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            return dayNames[d as number] || d;
+          }).join(", ");
+        };
+
         prompt += `- ${task.name} (ID: ${task.id})\n`;
-        prompt += `  - Type: ${task.type}, Duration: ${task.duration} minutes\n`;
-        prompt += `  - Priority: ${priority}, Flexible: ${task.isFlexible ? "Yes" : "No"}\n`;
+        prompt += `  - Type: ${task.type}, Category: ${task.category || "None"}, Duration: ${task.duration} minutes\n`;
+        prompt += `  - Priority: ${priority}\n`;
+
+        // Scheduling mode and constraints
+        if (task.schedulingMode === "fixed") {
+          prompt += `  - **FIXED SCHEDULE** - Must follow these constraints exactly:\n`;
+          if (task.fixedDays && (task.fixedDays as unknown[]).length > 0) {
+            const days = formatDays(task.fixedDays as unknown[]);
+            prompt += `    - Required days: ${days} (ONLY schedule on these days, NO other days)\n`;
+          }
+          if (task.fixedTime) {
+            prompt += `    - Required time: ${task.fixedTime} (MUST start at this exact time)\n`;
+          }
+        } else {
+          prompt += `  - Flexible scheduling\n`;
+          if (task.requiredDays && (task.requiredDays as unknown[]).length > 0) {
+            const days = formatDays(task.requiredDays as unknown[]);
+            prompt += `    - Required days: ${days} (ONLY schedule on these days)\n`;
+          }
+          if (task.preferredDays && (task.preferredDays as unknown[]).length > 0) {
+            const days = formatDays(task.preferredDays as unknown[]);
+            prompt += `    - Preferred days: ${days}\n`;
+          }
+          if (task.preferredTimeStart || task.preferredTimeEnd) {
+            prompt += `    - Preferred time window: ${task.preferredTimeStart || "any"} to ${task.preferredTimeEnd || "any"}\n`;
+          }
+        }
+
+        // Frequency
+        if (task.frequency && task.frequencyPeriod) {
+          prompt += `  - Frequency: ${task.frequency} time(s) per ${task.frequencyPeriod}\n`;
+        }
       }
     }
     prompt += `\n`;
@@ -374,11 +565,12 @@ function buildPlanningPrompt(
   prompt += `## Scheduling Guidelines\n`;
   prompt += `- Working hours: 8:00 AM to 9:00 PM\n`;
   prompt += `- Try to schedule each task 2-3 times during the week for regular practice\n`;
-  prompt += `- For household tasks, distribute fairly between family members\n`;
+  prompt += `- **CRITICAL: Resolution tasks (personal goals) must ONLY be assigned to the person who owns them. Never assign someone's resolution task to another family member.**\n`;
+  prompt += `- Household tasks CAN be distributed fairly between family members\n`;
   prompt += `- Avoid scheduling during existing calendar events\n`;
   prompt += `- Consider energy levels: physical tasks earlier, mental tasks when alert\n\n`;
 
-  prompt += `Generate the weekly schedule as a JSON object. Remember to use the exact task IDs and user IDs provided above.`;
+  prompt += `Generate the weekly schedule as a JSON object. Remember to use the exact task IDs and user IDs provided above. Each task MUST be assigned to its owner (the person whose tasks section it appears under).`;
 
   return prompt;
 }

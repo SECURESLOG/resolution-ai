@@ -67,8 +67,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Helper to extract start time for sorting
+    const getStartTime = (event: typeof eventsWithOwner[0]): number => {
+      const start = event.start;
+      if (typeof start === 'string') {
+        return new Date(start).getTime();
+      }
+      if (start instanceof Date) {
+        return start.getTime();
+      }
+      // It's an object with dateTime or date
+      const dateStr = start.dateTime || start.date;
+      return dateStr ? new Date(dateStr).getTime() : 0;
+    };
+
     // Sort all events by start time
-    eventsWithOwner.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    eventsWithOwner.sort((a, b) => getStartTime(a) - getStartTime(b));
 
     return NextResponse.json(eventsWithOwner);
   } catch (error) {

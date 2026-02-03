@@ -82,11 +82,29 @@ function buildSchedulingPrompt(params: {
 }): string {
   const { userName, calendarEvents, tasks, availableSlotsByDay, learnedPreferences, weekStart, weekEnd } = params;
 
+  // Helper to extract time string from CalendarEvent start/end
+  const getTimeString = (time: CalendarEvent['start']): string | undefined => {
+    if (typeof time === 'string') return time;
+    if (time instanceof Date) return time.toISOString();
+    return time.dateTime || time.date;
+  };
+
   const calendarSummary = calendarEvents.map((e) => ({
     title: e.summary,
-    start: e.start.dateTime || e.start.date,
-    end: e.end.dateTime || e.end.date,
+    start: getTimeString(e.start),
+    end: getTimeString(e.end),
   }));
+
+  // Helper to format day arrays
+  const formatDays = (days: unknown[] | null): string | null => {
+    if (!days || (days as unknown[]).length === 0) return null;
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return (days as unknown[]).map(d => {
+      if (typeof d === 'string') return d.charAt(0).toUpperCase() + d.slice(1);
+      if (typeof d === 'number') return dayNames[d];
+      return String(d);
+    }).join(", ");
+  };
 
   const tasksSummary = tasks.map((t) => ({
     id: t.id,
@@ -96,6 +114,13 @@ function buildSchedulingPrompt(params: {
     isFlexible: t.isFlexible,
     category: t.category,
     priority: t.priority,
+    schedulingMode: t.schedulingMode,
+    fixedDays: t.fixedDays ? formatDays(t.fixedDays as unknown[]) : null,
+    fixedTime: t.fixedTime,
+    requiredDays: t.requiredDays ? formatDays(t.requiredDays as unknown[]) : null,
+    preferredDays: t.preferredDays ? formatDays(t.preferredDays as unknown[]) : null,
+    frequency: t.frequency,
+    frequencyPeriod: t.frequencyPeriod,
   }));
 
   const slotsSummary = Object.entries(availableSlotsByDay).map(([date, slots]) => ({
@@ -130,12 +155,17 @@ ${JSON.stringify(tasksSummary, null, 2)}
 ${learnedPreferences ? `## Learned Preferences from Previous Feedback\n${JSON.stringify(learnedPreferences, null, 2)}` : ""}
 
 ## Instructions
-1. Analyze the available time slots and tasks
-2. Schedule non-flexible tasks first at appropriate times
-3. Find optimal slots for resolution tasks (consider time of day preferences - gym in morning, reading in evening, etc.)
-4. Distribute remaining household tasks in available gaps
-5. For each scheduled task, explain WHY you chose that time slot
-6. If a task cannot fit, add it to conflicts with alternatives
+1. **CRITICAL: Respect scheduling constraints:**
+   - Tasks with schedulingMode="fixed" MUST be scheduled on ALL of their fixedDays (e.g., if fixedDays="Monday, Tuesday, Wednesday, Thursday, Friday", create 5 separate schedule entries, one for each day)
+   - Tasks with fixedTime MUST be scheduled at that exact time on each scheduled day
+   - Tasks with requiredDays can ONLY be scheduled on those specific days
+   - The frequency field indicates how many times per week to schedule - match this with the number of entries you create
+2. Analyze the available time slots and tasks
+3. Schedule non-flexible tasks first at appropriate times
+4. Find optimal slots for resolution tasks (consider time of day preferences - gym in morning, reading in evening, etc.)
+5. Distribute remaining household tasks in available gaps
+6. For each scheduled task, explain WHY you chose that time slot
+7. If a task cannot fit due to constraints, add it to conflicts with alternatives
 
 ## Response Format
 Return ONLY a valid JSON object with this structure:
@@ -335,12 +365,19 @@ function buildFamilySchedulingPrompt(params: {
 }): string {
   const { familyMembers, memberAvailability, allTasks, familyTasks, weekStart, weekEnd } = params;
 
+  // Helper to extract time string from CalendarEvent start/end
+  const getTimeString = (time: CalendarEvent['start']): string | undefined => {
+    if (typeof time === 'string') return time;
+    if (time instanceof Date) return time.toISOString();
+    return time.dateTime || time.date;
+  };
+
   // Build member summaries
   const memberSummaries = familyMembers.map((member) => {
     const calendarSummary = member.calendarEvents.map((e) => ({
       title: e.summary,
-      start: e.start.dateTime || e.start.date,
-      end: e.end.dateTime || e.end.date,
+      start: getTimeString(e.start),
+      end: getTimeString(e.end),
     }));
 
     const slotsSummary = Object.entries(memberAvailability[member.userId]).map(([date, slots]) => ({
@@ -352,6 +389,17 @@ function buildFamilySchedulingPrompt(params: {
       })),
     }));
 
+    // Helper to format day arrays
+    const formatDays = (days: unknown[] | null): string | null => {
+      if (!days || (days as unknown[]).length === 0) return null;
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      return (days as unknown[]).map(d => {
+        if (typeof d === 'string') return d.charAt(0).toUpperCase() + d.slice(1);
+        if (typeof d === 'number') return dayNames[d];
+        return String(d);
+      }).join(", ");
+    };
+
     const personalTasks = member.tasks.map((t) => ({
       id: t.id,
       name: t.name,
@@ -360,6 +408,13 @@ function buildFamilySchedulingPrompt(params: {
       isFlexible: t.isFlexible,
       category: t.category,
       priority: t.priority,
+      schedulingMode: t.schedulingMode,
+      fixedDays: t.fixedDays ? formatDays(t.fixedDays as unknown[]) : null,
+      fixedTime: t.fixedTime,
+      requiredDays: t.requiredDays ? formatDays(t.requiredDays as unknown[]) : null,
+      preferredDays: t.preferredDays ? formatDays(t.preferredDays as unknown[]) : null,
+      frequency: t.frequency,
+      frequencyPeriod: t.frequencyPeriod,
     }));
 
     return {
@@ -371,6 +426,17 @@ function buildFamilySchedulingPrompt(params: {
     };
   });
 
+  // Helper to format day arrays for shared tasks
+  const formatDaysShared = (days: unknown[] | null): string | null => {
+    if (!days || (days as unknown[]).length === 0) return null;
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return (days as unknown[]).map(d => {
+      if (typeof d === 'string') return d.charAt(0).toUpperCase() + d.slice(1);
+      if (typeof d === 'number') return dayNames[d];
+      return String(d);
+    }).join(", ");
+  };
+
   const sharedTasksSummary = familyTasks.map((t) => ({
     id: t.id,
     name: t.name,
@@ -379,6 +445,13 @@ function buildFamilySchedulingPrompt(params: {
     isFlexible: t.isFlexible,
     category: t.category,
     priority: t.priority,
+    schedulingMode: t.schedulingMode,
+    fixedDays: t.fixedDays ? formatDaysShared(t.fixedDays as unknown[]) : null,
+    fixedTime: t.fixedTime,
+    requiredDays: t.requiredDays ? formatDaysShared(t.requiredDays as unknown[]) : null,
+    preferredDays: t.preferredDays ? formatDaysShared(t.preferredDays as unknown[]) : null,
+    frequency: t.frequency,
+    frequencyPeriod: t.frequencyPeriod,
   }));
 
   return `You are ResolutionAI, an intelligent FAMILY scheduling assistant. Your job is to help a 2-person family achieve their New Year's resolutions and fairly distribute household tasks by analyzing BOTH calendars.
@@ -418,12 +491,18 @@ ${JSON.stringify(sharedTasksSummary, null, 2)}
 5. Calculate and report a fairness score (50/50 is ideal)
 
 ## Instructions
-1. First analyze BOTH calendars to understand each person's availability
-2. Assign personal resolution tasks to their respective owners at optimal times
-3. Distribute shared household tasks fairly based on availability
-4. For each task, specify WHO it's assigned to (assignedToUserId)
-5. Explain why each task was assigned to that person
-6. If someone has a busy day, give more tasks to the other person that day
+1. **CRITICAL: Respect scheduling constraints:**
+   - Tasks with schedulingMode="fixed" MUST be scheduled on ALL of their fixedDays (e.g., if fixedDays="Monday, Tuesday, Wednesday, Thursday, Friday", create 5 separate schedule entries, one for each day)
+   - Tasks with fixedTime MUST be scheduled at that exact time on each scheduled day
+   - Tasks with requiredDays can ONLY be scheduled on those specific days
+   - The frequency field indicates how many times per week to schedule - match this with the number of entries you create
+   - Example: If fixedDays="Monday, Tuesday, Wednesday, Thursday, Friday" and frequency=5, create 5 entries (one for Mon, Tue, Wed, Thu, Fri)
+2. First analyze BOTH calendars to understand each person's availability
+3. Assign personal resolution tasks to their respective owners at optimal times
+4. Distribute shared household tasks fairly based on availability
+5. For each task, specify WHO it's assigned to (assignedToUserId)
+6. Explain why each task was assigned to that person
+7. If someone has a busy day, give more tasks to the other person that day
 
 ## Response Format
 Return ONLY a valid JSON object with this structure:
