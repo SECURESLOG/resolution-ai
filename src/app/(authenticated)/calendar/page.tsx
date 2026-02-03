@@ -80,7 +80,7 @@ export default function CalendarPage() {
         const endStr = format(weekEnd, "yyyy-MM-dd");
 
         const [calendarRes, tasksRes] = await Promise.all([
-          fetch(`/api/calendar?start=${startStr}&end=${endStr}`),
+          fetch(`/api/calendar?start=${startStr}&end=${endStr}&family=true`),
           fetch(`/api/scheduled-tasks?view=week&date=${startStr}&family=true`),
         ]);
 

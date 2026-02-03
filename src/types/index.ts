@@ -8,13 +8,19 @@ export interface CalendarEvent {
     dateTime?: string;
     date?: string;
     timeZone?: string;
-  };
+  } | Date | string;
   end: {
     dateTime?: string;
     date?: string;
     timeZone?: string;
-  };
+  } | Date | string;
   status?: string;
+  source?: "google" | "external";
+  calendarName?: string;
+  // Family sharing fields
+  userId?: string;
+  userName?: string;
+  isOwn?: boolean;
 }
 
 export interface TimeSlot {
