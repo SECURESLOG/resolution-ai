@@ -84,8 +84,8 @@ export default function LandingPage() {
     },
     {
       icon: BarChart3,
-      title: "AI Quality Insights",
-      description: "Transparent AI decisions with quality metrics and continuous improvement tracking.",
+      title: "Your AI - Full Transparency",
+      description: "See exactly what your AI learns, control what it remembers, and watch it improve over time.",
     },
   ];
 

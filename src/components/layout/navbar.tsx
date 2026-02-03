@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles, CalendarDays, Lightbulb, Timer, Activity } from "lucide-react";
+import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles, CalendarDays, Lightbulb, Timer, Brain } from "lucide-react";
 import { useState } from "react";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
@@ -28,7 +28,7 @@ export function Navbar() {
     { href: "/weekly-plan", label: "Weekly Plan", icon: CalendarDays },
     { href: "/focus", label: "Focus", icon: Timer },
     { href: "/insights", label: "Insights", icon: Lightbulb },
-    { href: "/opik-insights", label: "AI Quality", icon: Activity },
+    { href: "/opik-insights", label: "Your AI", icon: Brain },
     { href: "/family", label: "Family", icon: Users },
   ];
 

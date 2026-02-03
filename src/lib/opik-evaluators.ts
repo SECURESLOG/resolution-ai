@@ -545,3 +545,144 @@ export function trackPreferenceLearning(
   trace.end();
   return trace;
 }
+
+// ============================================
+// FEATURE 5: SCHEDULING ACCURACY TRACKING
+// ============================================
+
+export interface TaskOutcome {
+  userId: string;
+  scheduledTaskId: string;
+  taskName: string;
+  taskType: "resolution" | "household";
+  scheduledDate: Date;
+  scheduledTime: Date;
+  outcome: "completed" | "skipped";
+  feedback?: string;
+  weekNumber: number; // Week of the year for aggregation
+}
+
+/**
+ * Track task outcome for AI learning
+ * This logs to Opik when a user completes or skips a scheduled task,
+ * allowing us to measure scheduling accuracy over time.
+ */
+export function trackTaskOutcome(outcome: TaskOutcome) {
+  const isSuccessful = outcome.outcome === "completed";
+
+  const trace = opikClient.trace({
+    name: "learning:task_outcome",
+    input: {
+      userId: outcome.userId,
+      taskName: outcome.taskName,
+      taskType: outcome.taskType,
+      scheduledDate: outcome.scheduledDate.toISOString(),
+      scheduledTime: outcome.scheduledTime.toISOString(),
+      outcome: outcome.outcome,
+    },
+    metadata: {
+      feature: "scheduling_accuracy",
+      userId: outcome.userId,
+      taskId: outcome.scheduledTaskId,
+      weekNumber: outcome.weekNumber,
+      taskType: outcome.taskType,
+    },
+  });
+
+  // Score the scheduling accuracy for this task
+  trace.score({
+    name: "scheduling_accuracy",
+    value: isSuccessful ? 1.0 : 0.0,
+    reason: isSuccessful
+      ? `Task "${outcome.taskName}" completed as scheduled`
+      : `Task "${outcome.taskName}" was skipped - scheduling may need adjustment`,
+  });
+
+  // Additional score for time preference learning
+  const hour = outcome.scheduledTime.getHours();
+  const timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+
+  trace.score({
+    name: "time_preference_signal",
+    value: isSuccessful ? 1.0 : 0.0,
+    reason: `${isSuccessful ? "Prefers" : "Dislikes"} ${outcome.taskName} in the ${timeOfDay}`,
+  });
+
+  trace.update({
+    output: {
+      successful: isSuccessful,
+      timeOfDay,
+      feedback: outcome.feedback,
+    },
+  });
+
+  trace.end();
+  return trace;
+}
+
+/**
+ * Track weekly scheduling accuracy aggregation
+ * Called at the end of each week to create an aggregate trace for trends
+ */
+export function trackWeeklyAccuracy(data: {
+  userId: string;
+  weekNumber: number;
+  weekStart: Date;
+  completed: number;
+  skipped: number;
+  total: number;
+  accuracyRate: number;
+  previousWeekRate?: number;
+}) {
+  const improvement = data.previousWeekRate !== undefined
+    ? data.accuracyRate - data.previousWeekRate
+    : 0;
+
+  const trace = opikClient.trace({
+    name: "learning:weekly_accuracy",
+    input: {
+      userId: data.userId,
+      weekNumber: data.weekNumber,
+      weekStart: data.weekStart.toISOString(),
+      completed: data.completed,
+      skipped: data.skipped,
+      total: data.total,
+    },
+    metadata: {
+      feature: "scheduling_accuracy",
+      userId: data.userId,
+      weekNumber: data.weekNumber,
+      aggregationType: "weekly",
+    },
+  });
+
+  // Score for this week's accuracy
+  trace.score({
+    name: "weekly_scheduling_accuracy",
+    value: data.accuracyRate,
+    reason: `Week ${data.weekNumber}: ${data.completed}/${data.total} tasks completed (${Math.round(data.accuracyRate * 100)}%)`,
+  });
+
+  // Score for improvement over previous week
+  if (data.previousWeekRate !== undefined) {
+    trace.score({
+      name: "accuracy_improvement",
+      value: Math.max(0, Math.min(1, 0.5 + improvement)),
+      reason: improvement >= 0
+        ? `Improved by ${Math.round(improvement * 100)}% from previous week`
+        : `Decreased by ${Math.round(Math.abs(improvement) * 100)}% from previous week`,
+    });
+  }
+
+  trace.update({
+    output: {
+      accuracyRate: data.accuracyRate,
+      improvement: improvement,
+      completed: data.completed,
+      skipped: data.skipped,
+    },
+  });
+
+  trace.end();
+  return trace;
+}

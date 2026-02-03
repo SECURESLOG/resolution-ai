@@ -170,6 +170,10 @@ model ScheduledTask {
   aiReasoning         String?  @db.Text
   createdAt           DateTime @default(now())
 
+  // AI Learning control
+  learningEnabled     Boolean  @default(true) // Whether AI should learn from this task's outcome
+  outcomeRecordedAt   DateTime? // When the outcome was recorded (for evidence trail)
+
   // Manual move tracking
   wasManuallyMoved    Boolean  @default(false)
   originalStartTime   DateTime? // Original time before manual move
@@ -190,6 +194,8 @@ model ScheduledTask {
   conflictsAsMoved     ScheduleConflict[] @relation("MovedTask")
   // Conflicts where this task was displaced
   conflictsAsDisplaced ScheduleConflict[] @relation("DisplacedScheduledTask")
+  // Evidence for learned preferences
+  preferenceEvidence   PreferenceEvidence[]
 }
 
 model Feedback {
@@ -261,12 +267,34 @@ model UserPreference {
   value      Json     // Flexible storage for different preference types
   confidence Float    @default(0.5) // 0-1, how confident the system is in this preference
   source     String   @default("inferred") // "inferred", "explicit", "default"
+  isActive   Boolean  @default(true) // For "Forget" functionality - keeps data but disables preference
   updatedAt  DateTime @updatedAt
   createdAt  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidence PreferenceEvidence[]
 
   @@unique([userId, key])
+}
+
+// Evidence trail for learned preferences
+model PreferenceEvidence {
+  id               String   @id @default(cuid())
+  preferenceId     String
+  scheduledTaskId  String
+  signalType       String   // "completed", "skipped", "rescheduled"
+  signalStrength   Float    @default(1.0) // Weight of this evidence (1.0 = normal, higher = stronger signal)
+  taskName         String   // Denormalized for display
+  scheduledTime    DateTime // When the task was scheduled
+  dayOfWeek        String   // "monday", "tuesday", etc.
+  timeOfDay        String   // "morning", "afternoon", "evening"
+  createdAt        DateTime @default(now())
+
+  preference    UserPreference @relation(fields: [preferenceId], references: [id], onDelete: Cascade)
+  scheduledTask ScheduledTask  @relation(fields: [scheduledTaskId], references: [id], onDelete: Cascade)
+
+  @@index([preferenceId])
+  @@index([scheduledTaskId])
 }
 
 // Store agent conversation context and decision history

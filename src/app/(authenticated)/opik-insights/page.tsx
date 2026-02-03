@@ -21,6 +21,13 @@ import {
   Heart,
   Target,
   GitBranch,
+  Eye,
+  EyeOff,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  XCircle,
+  RotateCcw,
 } from "lucide-react";
 
 interface BurnoutRisk {
@@ -76,6 +83,67 @@ interface WeeklyTrend {
   conflicts: number;
 }
 
+interface LearningCurveWeek {
+  weekNumber: number;
+  weekLabel: string;
+  completed: number;
+  skipped: number;
+  total: number;
+  accuracy: number | null;
+}
+
+interface LearningCurveMetrics {
+  firstWeekAccuracy: number | null;
+  currentAccuracy: number | null;
+  improvement: number;
+  totalWeeksTracked: number;
+  preferencesLearnedThisMonth: number;
+  preferencesLearnedLastMonth: number;
+}
+
+interface LearningCurve {
+  weeks: LearningCurveWeek[];
+  metrics: LearningCurveMetrics;
+}
+
+// Learned Preferences with Evidence
+interface PreferenceEvidence {
+  id: string;
+  signalType: "completed" | "skipped" | "rescheduled";
+  taskName: string;
+  scheduledTime: string;
+  dayOfWeek: string;
+  timeOfDay: string;
+  createdAt: string;
+}
+
+interface LearnedPreferenceDetail {
+  id: string;
+  key: string;
+  taskName: string;
+  insight: string;
+  confidence: number;
+  isActive: boolean;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+  summary: {
+    completedCount: number;
+    skippedCount: number;
+    rescheduledCount: number;
+    totalEvidence: number;
+    dominantTime: string;
+    dominantDays: string[];
+  };
+  evidence: PreferenceEvidence[];
+}
+
+interface PreferencesData {
+  preferences: LearnedPreferenceDetail[];
+  totalPreferences: number;
+  activePreferences: number;
+}
+
 interface OpikStats {
   burnoutRisk: BurnoutRisk;
   familyFairness: FamilyFairness | null;
@@ -83,6 +151,7 @@ interface OpikStats {
   conflicts: ConflictData;
   intelligenceLoop: IntelligenceLoop;
   weeklyTrends: WeeklyTrend[];
+  learningCurve?: LearningCurve;
 }
 
 interface EvaluationResult {
@@ -103,8 +172,15 @@ export default function OpikInsightsPage() {
     result: EvaluationResult;
   } | null>(null);
 
+  // Learned Preferences state
+  const [preferencesData, setPreferencesData] = useState<PreferencesData | null>(null);
+  const [preferencesLoading, setPreferencesLoading] = useState(false);
+  const [expandedPreference, setExpandedPreference] = useState<string | null>(null);
+  const [updatingPreference, setUpdatingPreference] = useState<string | null>(null);
+
   useEffect(() => {
     fetchStats();
+    fetchPreferences();
   }, []);
 
   const fetchStats = async () => {
@@ -119,6 +195,57 @@ export default function OpikInsightsPage() {
       console.error("Failed to fetch stats:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPreferences = async () => {
+    try {
+      setPreferencesLoading(true);
+      const response = await fetch("/api/preferences");
+      if (response.ok) {
+        const data = await response.json();
+        setPreferencesData(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch preferences:", error);
+    } finally {
+      setPreferencesLoading(false);
+    }
+  };
+
+  const togglePreferenceActive = async (preferenceId: string, currentlyActive: boolean) => {
+    setUpdatingPreference(preferenceId);
+    try {
+      const response = await fetch(`/api/preferences/${preferenceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentlyActive }),
+      });
+      if (response.ok) {
+        await fetchPreferences();
+      }
+    } catch (error) {
+      console.error("Failed to toggle preference:", error);
+    } finally {
+      setUpdatingPreference(null);
+    }
+  };
+
+  const deletePreference = async (preferenceId: string) => {
+    if (!confirm("Permanently delete this preference and all its evidence?")) return;
+
+    setUpdatingPreference(preferenceId);
+    try {
+      const response = await fetch(`/api/preferences/${preferenceId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        await fetchPreferences();
+      }
+    } catch (error) {
+      console.error("Failed to delete preference:", error);
+    } finally {
+      setUpdatingPreference(null);
     }
   };
 
@@ -164,11 +291,11 @@ export default function OpikInsightsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Activity className="h-8 w-8 text-purple-600" />
-            AI Quality Intelligence
+            <Brain className="h-8 w-8 text-purple-600" />
+            Your AI
           </h1>
           <p className="text-gray-600 mt-1">
-            Powered by Opik - LLM Observability & Evaluation Platform
+            See how your AI learns, what it knows, and control what it remembers
           </p>
         </div>
         <Button onClick={fetchStats} variant="outline">
@@ -229,6 +356,336 @@ export default function OpikInsightsPage() {
           subtext={`+${stats?.intelligenceLoop.improvement || 0}% improvement`}
         />
       </div>
+
+      {/* AI Learning Curve - The Hero Section */}
+      <Card className="border-2 border-purple-200 bg-gradient-to-br from-white to-purple-50">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <TrendingUp className="h-6 w-6 text-purple-600" />
+                AI Learning Curve
+              </CardTitle>
+              <CardDescription>
+                Watch the AI get smarter at scheduling your tasks over time
+              </CardDescription>
+            </div>
+            {stats?.learningCurve?.metrics && (
+              <div className="text-right">
+                <div className="text-3xl font-bold text-purple-600">
+                  {stats.learningCurve.metrics.firstWeekAccuracy !== null &&
+                  stats.learningCurve.metrics.currentAccuracy !== null ? (
+                    <>
+                      {stats.learningCurve.metrics.firstWeekAccuracy}%{" "}
+                      <ArrowRight className="inline h-5 w-5" />{" "}
+                      {stats.learningCurve.metrics.currentAccuracy}%
+                    </>
+                  ) : (
+                    `${stats.learningCurve.metrics.currentAccuracy || 0}%`
+                  )}
+                </div>
+                <div className="text-sm text-gray-500">Scheduling Accuracy</div>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Learning Curve Visualization */}
+          <div className="mb-6">
+            <div className="flex items-end justify-between h-40 gap-2 px-2">
+              {stats?.learningCurve?.weeks.map((week, i) => {
+                const accuracy = week.accuracy !== null ? week.accuracy * 100 : 0;
+                const hasData = week.total > 0;
+
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center">
+                    <div className="relative w-full flex flex-col items-center">
+                      {/* Accuracy bar */}
+                      <div
+                        className={`w-full max-w-[40px] rounded-t transition-all ${
+                          hasData
+                            ? accuracy >= 80
+                              ? "bg-green-500"
+                              : accuracy >= 60
+                                ? "bg-blue-500"
+                                : accuracy >= 40
+                                  ? "bg-yellow-500"
+                                  : "bg-red-400"
+                            : "bg-gray-200"
+                        }`}
+                        style={{ height: hasData ? `${Math.max(accuracy * 1.2, 8)}px` : "8px" }}
+                        title={hasData ? `${Math.round(accuracy)}% accuracy` : "No data"}
+                      />
+                      {/* Accuracy label */}
+                      {hasData && (
+                        <span className="absolute -top-5 text-xs font-medium text-gray-600">
+                          {Math.round(accuracy)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2 truncate w-full text-center">
+                      {week.weekLabel.split(" ")[0]}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {hasData ? `${week.completed}/${week.total}` : "-"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 rounded" />
+                <span>80%+</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-500 rounded" />
+                <span>60-79%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded" />
+                <span>40-59%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-red-400 rounded" />
+                <span>&lt;40%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Learning Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-3 bg-white rounded-lg border border-purple-100">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Improvement</p>
+              <p className={`text-xl font-bold ${
+                (stats?.learningCurve?.metrics.improvement || 0) >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}>
+                {(stats?.learningCurve?.metrics.improvement || 0) >= 0 ? "+" : ""}
+                {stats?.learningCurve?.metrics.improvement || 0}%
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-lg border border-purple-100">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Weeks Tracked</p>
+              <p className="text-xl font-bold text-purple-600">
+                {stats?.learningCurve?.metrics.totalWeeksTracked || 0}
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-lg border border-purple-100">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Prefs Learned</p>
+              <p className="text-xl font-bold text-blue-600">
+                {stats?.learningCurve?.metrics.preferencesLearnedThisMonth || 0}
+                <span className="text-sm font-normal text-gray-400"> this month</span>
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-lg border border-purple-100">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Learning Rate</p>
+              <p className="text-xl font-bold text-indigo-600">
+                {stats?.learningCurve?.metrics.preferencesLearnedThisMonth &&
+                stats?.learningCurve?.metrics.preferencesLearnedLastMonth
+                  ? stats.learningCurve.metrics.preferencesLearnedThisMonth >
+                    stats.learningCurve.metrics.preferencesLearnedLastMonth
+                    ? "Accelerating"
+                    : "Steady"
+                  : "Starting"}
+              </p>
+            </div>
+          </div>
+
+          {/* How It Works */}
+          <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-100">
+            <p className="text-sm font-medium text-purple-900 mb-2">How the AI Learns:</p>
+            <div className="grid md:grid-cols-3 gap-4 text-sm text-purple-700">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 mt-0.5 text-green-600 shrink-0" />
+                <span>When you <strong>complete</strong> a task, AI learns that time slot works for you</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-600 shrink-0" />
+                <span>When you <strong>skip</strong> a task, AI adjusts future scheduling</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Brain className="h-4 w-4 mt-0.5 text-purple-600 shrink-0" />
+                <span>Over time, AI predicts your <strong>optimal schedule</strong></span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Learned Preferences with Evidence Trail */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-purple-600" />
+                Learned Preferences
+              </CardTitle>
+              <CardDescription>
+                What the AI has learned about your scheduling preferences (with full evidence trail)
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchPreferences} disabled={preferencesLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${preferencesLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {preferencesLoading && !preferencesData ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+            </div>
+          ) : preferencesData?.preferences.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Brain className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+              <p>No preferences learned yet</p>
+              <p className="text-sm">Complete or skip some tasks to help the AI learn!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {preferencesData?.preferences.map((pref) => (
+                <div
+                  key={pref.id}
+                  className={`border rounded-lg overflow-hidden ${
+                    pref.isActive ? "border-purple-200" : "border-gray-200 opacity-60"
+                  }`}
+                >
+                  {/* Preference Header */}
+                  <div
+                    className={`p-4 cursor-pointer ${
+                      pref.isActive ? "bg-purple-50" : "bg-gray-50"
+                    }`}
+                    onClick={() =>
+                      setExpandedPreference(expandedPreference === pref.id ? null : pref.id)
+                    }
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Brain className={`h-4 w-4 ${pref.isActive ? "text-purple-600" : "text-gray-400"}`} />
+                          <span className="font-medium">{pref.taskName}</span>
+                          {!pref.isActive && (
+                            <Badge variant="outline" className="text-xs">Forgotten</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{pref.insight}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Target className="h-3 w-3" />
+                            {pref.confidence}% confidence
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <BarChart3 className="h-3 w-3" />
+                            {pref.summary.totalEvidence} data points
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3 text-green-600" />
+                            {pref.summary.completedCount} completed
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <XCircle className="h-3 w-3 text-orange-600" />
+                            {pref.summary.skippedCount} skipped
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {expandedPreference === pref.id ? (
+                          <ChevronUp className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Evidence Trail */}
+                  {expandedPreference === pref.id && (
+                    <div className="border-t border-purple-100">
+                      {/* Action Buttons */}
+                      <div className="p-3 bg-white border-b border-purple-100 flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePreferenceActive(pref.id, pref.isActive);
+                          }}
+                          disabled={updatingPreference === pref.id}
+                        >
+                          {updatingPreference === pref.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : pref.isActive ? (
+                            <EyeOff className="h-3 w-3 mr-1" />
+                          ) : (
+                            <Eye className="h-3 w-3 mr-1" />
+                          )}
+                          {pref.isActive ? "Forget This" : "Re-enable"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePreference(pref.id);
+                          }}
+                          disabled={updatingPreference === pref.id}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete Permanently
+                        </Button>
+                      </div>
+
+                      {/* Evidence List */}
+                      <div className="p-3 bg-white max-h-64 overflow-y-auto">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                          Evidence Trail ({pref.evidence.length} data points)
+                        </p>
+                        <div className="space-y-2">
+                          {pref.evidence.map((ev) => (
+                            <div
+                              key={ev.id}
+                              className="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded"
+                            >
+                              {ev.signalType === "completed" ? (
+                                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                              ) : ev.signalType === "skipped" ? (
+                                <XCircle className="h-4 w-4 text-orange-600 shrink-0" />
+                              ) : (
+                                <RotateCcw className="h-4 w-4 text-blue-600 shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium capitalize">{ev.signalType}</span>
+                                <span className="mx-2 text-gray-400">|</span>
+                                <span className="text-gray-600">
+                                  {new Date(ev.scheduledTime).toLocaleDateString()} at{" "}
+                                  {new Date(ev.scheduledTime).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                                <span className="mx-2 text-gray-400">|</span>
+                                <span className="text-gray-500 capitalize">
+                                  {ev.dayOfWeek} {ev.timeOfDay}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-2 gap-6">

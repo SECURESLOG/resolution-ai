@@ -26,6 +26,7 @@ import {
 } from "date-fns";
 import { CalendarEvent } from "@/types";
 import { TaskFeedbackModal } from "@/components/feedback/task-feedback-modal";
+import { TaskActionDialog } from "@/components/tasks/task-action-dialog";
 import { useRegisterPageContext } from "@/contexts/AIAssistantContext";
 
 interface ScheduledTask {
@@ -109,6 +110,11 @@ export default function CalendarPage() {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
 
+  // Task action dialog state
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [actionTask, setActionTask] = useState<ScheduledTask | null>(null);
+  const [pendingAction, setPendingAction] = useState<"complete" | "skip">("complete");
+
   // Register page context for AI assistant
   useRegisterPageContext("/calendar", "Calendar", {
     tasksCount: scheduledTasks.length,
@@ -155,27 +161,48 @@ export default function CalendarPage() {
     fetchData();
   }, [weekStart, weekEnd]);
 
-  async function updateTaskStatus(taskId: string, status: string, showFeedback = true) {
+  // Initiate task action with learning dialog
+  function initiateTaskAction(task: ScheduledTask, action: "complete" | "skip") {
+    setActionTask(task);
+    setPendingAction(action);
+    setActionDialogOpen(true);
+  }
+
+  // Handle confirmed task action
+  async function handleTaskActionConfirm(learningEnabled: boolean) {
+    if (!actionTask) return;
+
+    const status = pendingAction === "complete" ? "completed" : "skipped";
+
     try {
-      const response = await fetch(`/api/scheduled-tasks/${taskId}`, {
+      const response = await fetch(`/api/scheduled-tasks/${actionTask.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, learningEnabled }),
       });
 
-      if (response.ok && status === "completed" && showFeedback) {
-        // Find the task and show feedback modal
-        const task = scheduledTasks.find(t => t.id === taskId);
-        if (task) {
-          setFeedbackTask(task);
-          setFeedbackModalOpen(true);
-        }
+      if (response.ok && status === "completed") {
+        // Show feedback modal for completed tasks
+        setFeedbackTask(actionTask);
+        setFeedbackModalOpen(true);
       }
 
       // Trigger re-fetch by updating currentWeek to same value
       setCurrentWeek(new Date(currentWeek));
     } catch (error) {
       console.error("Error updating task:", error);
+    }
+
+    // Reset action dialog state
+    setActionTask(null);
+    setActionDialogOpen(false);
+  }
+
+  // Legacy function for backward compatibility
+  async function updateTaskStatus(taskId: string, status: string, showFeedback = true) {
+    const task = scheduledTasks.find(t => t.id === taskId);
+    if (task) {
+      initiateTaskAction(task, status === "completed" ? "complete" : "skip");
     }
   }
 
@@ -455,6 +482,20 @@ export default function CalendarPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Task Action Dialog (Learning Control) */}
+      {actionTask && (
+        <TaskActionDialog
+          isOpen={actionDialogOpen}
+          onClose={() => {
+            setActionDialogOpen(false);
+            setActionTask(null);
+          }}
+          taskName={actionTask.task.name}
+          action={pendingAction}
+          onConfirm={handleTaskActionConfirm}
+        />
+      )}
 
       {/* Task Feedback Modal */}
       {feedbackTask && (

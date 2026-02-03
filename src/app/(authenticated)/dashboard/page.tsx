@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TaskFeedbackDialog } from "@/components/feedback/task-feedback-dialog";
+import { TaskActionDialog } from "@/components/tasks/task-action-dialog";
 import { WeeklyProgress } from "@/components/dashboard/weekly-progress";
 import { DailyInsight } from "@/components/dashboard/daily-insight";
 import {
@@ -73,6 +74,11 @@ export default function DashboardPage() {
   const [approving, setApproving] = useState(false);
   const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+
+  // Task action dialog state (for learning control)
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [actionTask, setActionTask] = useState<ScheduledTask | null>(null);
+  const [pendingAction, setPendingAction] = useState<"complete" | "skip">("complete");
 
   useEffect(() => {
     fetchData();
@@ -146,26 +152,62 @@ export default function DashboardPage() {
     }
   }
 
-  async function updateTaskStatus(taskId: string, status: string, askForFeedback = false) {
+  // Initiate task action with learning dialog
+  function initiateTaskAction(task: ScheduledTask, action: "complete" | "skip") {
+    setActionTask(task);
+    setPendingAction(action);
+    setActionDialogOpen(true);
+  }
+
+  // Handle confirmed task action with learning preference
+  async function handleTaskActionConfirm(learningEnabled: boolean) {
+    if (!actionTask) return;
+
+    const status = pendingAction === "complete" ? "completed" : "skipped";
+
     try {
-      await fetch(`/api/scheduled-tasks/${taskId}`, {
+      await fetch(`/api/scheduled-tasks/${actionTask.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, learningEnabled }),
       });
 
       // If completing a task, show feedback dialog
-      if (status === "completed" && askForFeedback) {
-        const task = todaySchedule.find(t => t.id === taskId);
-        if (task) {
-          setFeedbackTask(task);
-          setShowFeedback(true);
-        }
+      if (status === "completed") {
+        setFeedbackTask(actionTask);
+        setShowFeedback(true);
       }
 
       fetchData();
     } catch (error) {
       console.error("Error updating task:", error);
+    }
+
+    // Reset action dialog state
+    setActionTask(null);
+    setActionDialogOpen(false);
+  }
+
+  // Legacy function - now opens dialog for user control
+  async function updateTaskStatus(taskId: string, status: string, askForFeedback = false) {
+    const task = todaySchedule.find(t => t.id === taskId);
+    if (task) {
+      // For completing or skipping, show learning dialog
+      if (status === "completed" || status === "skipped") {
+        initiateTaskAction(task, status === "completed" ? "complete" : "skip");
+      } else {
+        // For reverting to pending, just do it directly
+        try {
+          await fetch(`/api/scheduled-tasks/${taskId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          });
+          fetchData();
+        } catch (error) {
+          console.error("Error updating task:", error);
+        }
+      }
     }
   }
 
@@ -564,6 +606,20 @@ export default function DashboardPage() {
       </div>
 
       {/* Task Feedback Dialog */}
+      {/* Task Action Dialog (Learning Control) */}
+      {actionTask && (
+        <TaskActionDialog
+          isOpen={actionDialogOpen}
+          onClose={() => {
+            setActionDialogOpen(false);
+            setActionTask(null);
+          }}
+          taskName={actionTask.task.name}
+          action={pendingAction}
+          onConfirm={handleTaskActionConfirm}
+        />
+      )}
+
       {feedbackTask && (
         <TaskFeedbackDialog
           open={showFeedback}

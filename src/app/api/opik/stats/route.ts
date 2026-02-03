@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
+import { startOfWeek, endOfWeek, subWeeks, format, getWeek } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -189,7 +189,7 @@ export async function GET() {
     const baselineAdherence = 0.6;
     const intelligenceImprovement = ((recentAdherence - baselineAdherence) / baselineAdherence) * 100;
 
-    // === WEEKLY TRENDS ===
+    // === WEEKLY TRENDS (4 weeks) ===
     const weeklyTrends = [];
     for (let i = 3; i >= 0; i--) {
       const weekStart = subWeeks(currentWeekStart, i);
@@ -214,6 +214,65 @@ export async function GET() {
         conflicts: conflictsByWeek.get(format(weekStart, "yyyy-MM-dd")) || 0,
       });
     }
+
+    // === AI LEARNING CURVE (8 weeks) ===
+    const learningCurve = [];
+    const eightWeeksAgo = subWeeks(currentWeekStart, 8);
+
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = subWeeks(currentWeekStart, i);
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+      const weekTasks = await prisma.scheduledTask.findMany({
+        where: {
+          assignedToUserId: session.user.id,
+          scheduledDate: { gte: weekStart, lte: weekEnd },
+          status: { in: ["completed", "skipped"] },
+        },
+        select: { status: true },
+      });
+
+      const completed = weekTasks.filter((t) => t.status === "completed").length;
+      const skipped = weekTasks.filter((t) => t.status === "skipped").length;
+      const total = completed + skipped;
+      const accuracy = total > 0 ? completed / total : null;
+
+      learningCurve.push({
+        weekNumber: getWeek(weekStart, { weekStartsOn: 1 }),
+        weekLabel: format(weekStart, "MMM d"),
+        completed,
+        skipped,
+        total,
+        accuracy,
+      });
+    }
+
+    // Calculate learning metrics
+    const weeksWithData = learningCurve.filter((w) => w.accuracy !== null);
+    const firstWeekAccuracy = weeksWithData.length > 0 ? weeksWithData[0].accuracy : null;
+    const lastWeekAccuracy = weeksWithData.length > 0 ? weeksWithData[weeksWithData.length - 1].accuracy : null;
+    const accuracyImprovement =
+      firstWeekAccuracy !== null && lastWeekAccuracy !== null
+        ? lastWeekAccuracy - firstWeekAccuracy
+        : 0;
+
+    // Count new preferences learned in each time period
+    const preferencesThisMonth = await prisma.userPreference.count({
+      where: {
+        userId: session.user.id,
+        createdAt: { gte: subWeeks(now, 4) },
+      },
+    });
+
+    const preferencesLastMonth = await prisma.userPreference.count({
+      where: {
+        userId: session.user.id,
+        createdAt: {
+          gte: subWeeks(now, 8),
+          lt: subWeeks(now, 4),
+        },
+      },
+    });
 
     return NextResponse.json({
       burnoutRisk: {
@@ -243,6 +302,18 @@ export async function GET() {
         improvement: Math.round(intelligenceImprovement),
       },
       weeklyTrends,
+      // AI Learning Curve data
+      learningCurve: {
+        weeks: learningCurve,
+        metrics: {
+          firstWeekAccuracy: firstWeekAccuracy !== null ? Math.round(firstWeekAccuracy * 100) : null,
+          currentAccuracy: lastWeekAccuracy !== null ? Math.round(lastWeekAccuracy * 100) : null,
+          improvement: Math.round(accuracyImprovement * 100),
+          totalWeeksTracked: weeksWithData.length,
+          preferencesLearnedThisMonth: preferencesThisMonth,
+          preferencesLearnedLastMonth: preferencesLastMonth,
+        },
+      },
     });
   } catch (error) {
     console.error("Error fetching Opik stats:", error);
