@@ -248,7 +248,7 @@ export default function WeeklyPlanPage() {
 
         // Only redirect if plan is fully approved
         if (data.planStatus === "approved") {
-          setTimeout(() => router.push("/calendar"), 2000);
+          setTimeout(() => router.push("/schedule"), 2000);
         }
       } else {
         setError(data.error || "Failed to process action");

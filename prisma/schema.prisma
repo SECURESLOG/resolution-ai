@@ -197,6 +197,8 @@ model ScheduledTask {
   conflictsAsDisplaced ScheduleConflict[] @relation("DisplacedScheduledTask")
   // Evidence for learned preferences
   preferenceEvidence   PreferenceEvidence[]
+  // Overlap tracking
+  overlaps             ScheduleOverlap[]
 }
 
 model Feedback {
@@ -482,4 +484,21 @@ model Notification {
 
   @@index([userId, scheduledFor])
   @@index([userId, readAt])
+}
+
+// Track schedule overlaps/conflicts for health metrics
+model ScheduleOverlap {
+  id               String    @id @default(cuid())
+  userId           String
+  scheduledTaskId  String?   // Our scheduled task (if applicable)
+  calendarEventId  String?   // External calendar event ID
+  overlapsWith     String?   // Description of what it overlaps with
+  overlapMinutes   Int       // Duration of overlap in minutes
+  userAccepted     Boolean   @default(false) // User acknowledged and scheduled anyway
+  weekOf           DateTime  // For weekly reporting
+  createdAt        DateTime  @default(now())
+
+  scheduledTask ScheduledTask? @relation(fields: [scheduledTaskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, weekOf])
 }

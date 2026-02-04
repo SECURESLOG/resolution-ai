@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, LayoutDashboard, Settings, LogOut, Menu, X, Users, Sparkles, CalendarDays, Lightbulb, Timer, Brain } from "lucide-react";
+import { Calendar, Home, Settings, LogOut, Menu, X, Brain } from "lucide-react";
 import { useState } from "react";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
@@ -22,14 +22,10 @@ export function Navbar() {
   if (!session) return null;
 
   const navLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/tasks", label: "Tasks", icon: CheckSquare },
-    { href: "/calendar", label: "Calendar", icon: Calendar },
-    { href: "/weekly-plan", label: "Weekly Plan", icon: CalendarDays },
-    { href: "/focus", label: "Focus", icon: Timer },
-    { href: "/insights", label: "Insights", icon: Lightbulb },
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/schedule", label: "Schedule", icon: Calendar },
     { href: "/opik-insights", label: "Your AI", icon: Brain },
-    { href: "/family", label: "Family", icon: Users },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -76,13 +72,6 @@ export function Navbar() {
                   <p className="text-sm font-medium">{session.user?.name}</p>
                   <p className="text-xs text-muted-foreground">{session.user?.email}</p>
                 </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-red-600"

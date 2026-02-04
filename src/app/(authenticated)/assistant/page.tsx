@@ -29,20 +29,20 @@ export default function AssistantPage() {
         <h3 className="text-sm font-medium text-gray-500 mb-3">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <QuickAction
-            label="View Calendar"
-            onClick={() => router.push("/calendar")}
+            label="Schedule"
+            onClick={() => router.push("/schedule")}
           />
           <QuickAction
-            label="My Tasks"
-            onClick={() => router.push("/tasks")}
-          />
-          <QuickAction
-            label="Dashboard"
+            label="Home"
             onClick={() => router.push("/dashboard")}
           />
           <QuickAction
-            label="Family"
-            onClick={() => router.push("/family")}
+            label="Your AI"
+            onClick={() => router.push("/opik-insights")}
+          />
+          <QuickAction
+            label="Settings"
+            onClick={() => router.push("/settings")}
           />
         </div>
       </div>

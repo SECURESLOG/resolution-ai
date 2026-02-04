@@ -4,29 +4,27 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TaskFeedbackDialog } from "@/components/feedback/task-feedback-dialog";
 import { TaskActionDialog } from "@/components/tasks/task-action-dialog";
-import { WeeklyProgress } from "@/components/dashboard/weekly-progress";
 import { DailyInsight } from "@/components/dashboard/daily-insight";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
+import { CollapsibleWeeklyPlan } from "@/components/dashboard/collapsible-weekly-plan";
+import { ScheduleHealthWidget } from "@/components/dashboard/schedule-health-widget";
 import {
-  Calendar,
   CheckCircle,
-  Clock,
+  Calendar,
   Flame,
-  Plus,
   Sparkles,
   Target,
   Home,
   AlertCircle,
   Loader2,
   Undo2,
-  Trophy,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { AIScheduleResponse, ScheduleRecommendation } from "@/types";
 
 interface Stats {
@@ -38,17 +36,7 @@ interface Stats {
   totalTasks: number;
   resolutionTasks: number;
   householdTasks: number;
-  // New stats
-  weeklyProgress: Array<{
-    day: string;
-    date: string;
-    scheduled: number;
-    completed: number;
-    isToday: boolean;
-  }>;
   completionRate: number;
-  resolutionRate: number;
-  topResolution: { name: string; total: number; completed: number; rate: number } | null;
 }
 
 interface ScheduledTask {
@@ -79,25 +67,24 @@ export default function DashboardPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [onboardingKey, setOnboardingKey] = useState(0);
 
-  // Task action dialog state (for learning control)
+  // Task action dialog state
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionTask, setActionTask] = useState<ScheduledTask | null>(null);
   const [pendingAction, setPendingAction] = useState<"complete" | "skip">("complete");
 
-  // Onboarding step handlers
+  // Onboarding step handlers - updated for new navigation
   const handleOnboardingStepClick = useCallback((step: string) => {
     if (step === "calendar") {
-      router.push("/settings");
+      router.push("/settings?tab=calendars"); // Go directly to Calendars tab
     } else if (step === "task") {
-      router.push("/tasks");
+      router.push("/schedule"); // Schedule page with task sidebar
     } else if (step === "feedback") {
-      // Find a completed task to give feedback on
       const completedTask = todaySchedule.find(t => t.status === "completed");
       if (completedTask) {
         setFeedbackTask(completedTask);
         setShowFeedback(true);
       } else {
-        router.push("/calendar");
+        router.push("/schedule");
       }
     }
   }, [router, todaySchedule]);
@@ -106,10 +93,8 @@ export default function DashboardPage() {
     if (type === "week") {
       await generateSchedule();
     } else {
-      // For single task, use the AI assistant
-      router.push("/assistant");
+      router.push("/schedule");
     }
-    // Refresh onboarding state after generating
     setOnboardingKey(prev => prev + 1);
   }, [router]);
 
@@ -124,12 +109,8 @@ export default function DashboardPage() {
         fetch("/api/scheduled-tasks?view=day"),
       ]);
 
-      if (statsRes.ok) {
-        setStats(await statsRes.json());
-      }
-      if (scheduleRes.ok) {
-        setTodaySchedule(await scheduleRes.json());
-      }
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (scheduleRes.ok) setTodaySchedule(await scheduleRes.json());
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -145,10 +126,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/schedule/generate", { method: "POST" });
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate schedule");
-      }
-
+      if (!res.ok) throw new Error(data.error || "Failed to generate schedule");
       setScheduleResult(data);
     } catch (error) {
       console.error("Error generating schedule:", error);
@@ -169,10 +147,7 @@ export default function DashboardPage() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to approve schedule");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to approve schedule");
 
       alert(data.message);
       setScheduleResult(null);
@@ -185,14 +160,12 @@ export default function DashboardPage() {
     }
   }
 
-  // Initiate task action with learning dialog
   function initiateTaskAction(task: ScheduledTask, action: "complete" | "skip") {
     setActionTask(task);
     setPendingAction(action);
     setActionDialogOpen(true);
   }
 
-  // Handle confirmed task action with learning preference
   async function handleTaskActionConfirm(learningEnabled: boolean) {
     if (!actionTask) return;
 
@@ -205,7 +178,6 @@ export default function DashboardPage() {
         body: JSON.stringify({ status, learningEnabled }),
       });
 
-      // If completing a task, show feedback dialog
       if (status === "completed") {
         setFeedbackTask(actionTask);
         setShowFeedback(true);
@@ -216,20 +188,16 @@ export default function DashboardPage() {
       console.error("Error updating task:", error);
     }
 
-    // Reset action dialog state
     setActionTask(null);
     setActionDialogOpen(false);
   }
 
-  // Legacy function - now opens dialog for user control
-  async function updateTaskStatus(taskId: string, status: string, askForFeedback = false) {
+  async function updateTaskStatus(taskId: string, status: string) {
     const task = todaySchedule.find(t => t.id === taskId);
     if (task) {
-      // For completing or skipping, show learning dialog
       if (status === "completed" || status === "skipped") {
         initiateTaskAction(task, status === "completed" ? "complete" : "skip");
       } else {
-        // For reverting to pending, just do it directly
         try {
           await fetch(`/api/scheduled-tasks/${taskId}`, {
             method: "PATCH",
@@ -253,29 +221,30 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {session?.user?.name?.split(" ")[0] || "there"}!
+          <h1 className="text-2xl font-bold text-gray-900">
+            {session?.user?.name?.split(" ")[0] || "Hey"}, here&apos;s your day
           </h1>
-          <p className="text-gray-600 mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+          <p className="text-gray-600 text-sm">{format(new Date(), "EEEE, MMMM d")} - Focus on doing, not deciding</p>
         </div>
         <Button
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           onClick={generateSchedule}
           disabled={generating}
+          size="sm"
         >
           {generating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
+              Optimizing...
             </>
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Generate This Week&apos;s Schedule
+              Optimize My Week
             </>
           )}
         </Button>
@@ -288,64 +257,56 @@ export default function DashboardPage() {
         onGenerateSchedule={handleOnboardingGenerateSchedule}
       />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
+      {/* Compact Stats Row */}
+      <div className="grid grid-cols-4 gap-3">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50">
+          <CardContent className="pt-4 pb-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Today</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs text-gray-600">Today&apos;s Progress</p>
+                <p className="text-xl font-bold text-blue-700">
                   {stats?.completedToday || 0}/{stats?.todayTasks || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-blue-600" />
-              </div>
+              <CheckCircle className="h-8 w-8 text-blue-500/30" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50">
+          <CardContent className="pt-4 pb-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">This Week</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs text-gray-600">Week&apos;s Progress</p>
+                <p className="text-xl font-bold text-purple-700">
                   {stats?.completedWeek || 0}/{stats?.weekTasks || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-purple-600" />
-              </div>
+              <Calendar className="h-8 w-8 text-purple-500/30" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50">
+          <CardContent className="pt-4 pb-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Streak</p>
-                <p className="text-2xl font-bold">{stats?.streakDays || 0} days</p>
+                <p className="text-xs text-gray-600">Consistency</p>
+                <p className="text-xl font-bold text-orange-700">{stats?.streakDays || 0} days</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <Flame className="w-6 h-6 text-orange-600" />
-              </div>
+              <Flame className="h-8 w-8 text-orange-500/30" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100/50">
+          <CardContent className="pt-4 pb-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Tasks</p>
-                <p className="text-2xl font-bold">{stats?.totalTasks || 0}</p>
+                <p className="text-xs text-gray-600">Follow-through</p>
+                <p className="text-xl font-bold text-green-700">{stats?.completionRate || 0}%</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Target className="w-6 h-6 text-green-600" />
-              </div>
+              <Target className="h-8 w-8 text-green-500/30" />
             </div>
           </CardContent>
         </Card>
@@ -354,299 +315,170 @@ export default function DashboardPage() {
       {/* AI Daily Insight */}
       <DailyInsight />
 
-      {/* Weekly Progress & Top Resolution */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {stats?.weeklyProgress && (
-          <WeeklyProgress
-            data={stats.weeklyProgress}
-            completionRate={stats.completionRate || 0}
-          />
-        )}
-
-        {/* Resolution Progress Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Resolution Progress</CardTitle>
-            <CardDescription>Your New Year&apos;s resolution performance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Resolution completion rate */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">30-day completion rate</span>
-                  <span className="text-lg font-bold text-blue-600">
-                    {stats?.resolutionRate || 0}%
-                  </span>
-                </div>
-                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
-                    style={{ width: `${stats?.resolutionRate || 0}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Top resolution */}
-              {stats?.topResolution && (
-                <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Trophy className="h-4 w-4 text-yellow-600" />
-                    <span className="text-xs font-medium text-yellow-700 uppercase">
-                      Top Resolution
-                    </span>
-                  </div>
-                  <p className="font-medium text-gray-800">{stats.topResolution.name}</p>
-                  <p className="text-sm text-gray-600">
-                    {stats.topResolution.rate}% completion ({stats.topResolution.completed}/
-                    {stats.topResolution.total})
-                  </p>
-                </div>
-              )}
-
-              {!stats?.topResolution && stats?.resolutionTasks === 0 && (
-                <div className="text-center py-4">
-                  <Target className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No resolutions yet</p>
-                  <Link href="/tasks">
-                    <Button variant="link" size="sm">
-                      Add your first resolution
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* AI Schedule Result */}
-      {scheduleResult && (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              AI Schedule Recommendations
-            </CardTitle>
-            <CardDescription>{scheduleResult.summary}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {scheduleResult.schedule.length > 0 ? (
-              <>
-                <div className="space-y-3 mb-6">
-                  {scheduleResult.schedule.map((rec, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-4 p-4 bg-white rounded-lg border"
-                    >
-                      <div className="flex-shrink-0">
-                        {rec.taskType === "resolution" ? (
-                          <Target className="h-5 w-5 text-blue-600" />
-                        ) : (
-                          <Home className="h-5 w-5 text-green-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium">{rec.taskName}</p>
-                          <Badge variant={rec.taskType === "resolution" ? "default" : "secondary"}>
-                            {rec.taskType}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(rec.date), "EEE, MMM d")} at {rec.startTime} - {rec.endTime}
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">{rec.reasoning}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => approveSchedule(scheduleResult.schedule)}
-                    disabled={approving}
-                  >
-                    {approving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Approving...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Approve & Add to Calendar
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="outline" onClick={() => setScheduleResult(null)}>
-                    Dismiss
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <p className="text-gray-600">No tasks to schedule. Add some tasks first!</p>
-            )}
-
-            {scheduleResult.conflicts.length > 0 && (
-              <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                <p className="font-medium text-yellow-800 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Some tasks couldn&apos;t be scheduled:
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {scheduleResult.conflicts.map((conflict, index) => (
-                    <li key={index} className="text-sm text-yellow-700">
-                      {conflict.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Today's Schedule */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Today&apos;s Schedule</CardTitle>
-              <CardDescription>Your tasks for today</CardDescription>
-            </div>
-            <Clock className="h-5 w-5 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            {todaySchedule.length > 0 ? (
-              <div className="space-y-3">
-                {todaySchedule.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      item.status === "completed"
-                        ? "bg-green-50 border-green-200"
-                        : "bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          updateTaskStatus(
-                            item.id,
-                            item.status === "completed" ? "pending" : "completed",
-                            item.status !== "completed" // Ask for feedback when completing
-                          )
-                        }
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          item.status === "completed"
-                            ? "bg-green-600 border-green-600"
-                            : "border-gray-300 hover:border-blue-600"
-                        }`}
-                        title={item.status === "completed" ? "Mark as pending" : "Mark as complete"}
-                      >
-                        {item.status === "completed" && (
-                          <CheckCircle className="h-3 w-3 text-white" />
-                        )}
-                      </button>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p
-                            className={`font-medium ${
-                              item.status === "completed" ? "line-through text-gray-500" : ""
-                            }`}
-                          >
-                            {item.task.name}
-                          </p>
-                          {item.streak && item.streak >= 2 && (
-                            <span
-                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700"
-                              title={`${item.streak} completions in a row!`}
-                            >
-                              <Flame className="h-3 w-3" />
-                              {item.streak}
-                            </span>
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Left Column - Today's Schedule */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* AI Schedule Result */}
+          {scheduleResult && (
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  AI Found Time For You
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {scheduleResult.schedule.length > 0 ? (
+                  <>
+                    <p className="text-sm text-gray-600 mb-3">{scheduleResult.summary}</p>
+                    <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
+                      {scheduleResult.schedule.map((rec, index) => (
+                        <div key={index} className="flex items-center gap-3 p-2 bg-white rounded border">
+                          {rec.taskType === "resolution" ? (
+                            <Target className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <Home className="h-4 w-4 text-green-600" />
                           )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{rec.taskName}</p>
+                            <p className="text-xs text-gray-500">
+                              {format(new Date(rec.date), "EEE, MMM d")} at {rec.startTime}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(item.startTime), "h:mm a")} -{" "}
-                          {format(new Date(item.endTime), "h:mm a")}
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => approveSchedule(scheduleResult.schedule)}
+                        disabled={approving}
+                      >
+                        {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lock It In"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setScheduleResult(null)}>
+                        Not Now
+                      </Button>
+                    </div>
+
+                    {scheduleResult.conflicts.length > 0 && (
+                      <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+                        <p className="text-xs text-yellow-800 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {scheduleResult.conflicts.length} item(s) need manual scheduling - your week is full!
                         </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {item.status === "completed" && (
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-600 text-sm">Add tasks first, then let AI find the best times.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Today's Schedule */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>Today&apos;s Schedule</span>
+                <Link href="/schedule">
+                  <Button variant="ghost" size="sm">View all</Button>
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {todaySchedule.length > 0 ? (
+                <div className="space-y-2">
+                  {todaySchedule.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        item.status === "completed"
+                          ? "bg-green-50 border-green-200"
+                          : "bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
                         <button
-                          onClick={() => updateTaskStatus(item.id, "pending")}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Undo - mark as pending"
+                          onClick={() =>
+                            updateTaskStatus(
+                              item.id,
+                              item.status === "completed" ? "pending" : "completed"
+                            )
+                          }
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            item.status === "completed"
+                              ? "bg-green-600 border-green-600"
+                              : "border-gray-300 hover:border-blue-600"
+                          }`}
                         >
-                          <Undo2 className="h-4 w-4" />
+                          {item.status === "completed" && (
+                            <CheckCircle className="h-3 w-3 text-white" />
+                          )}
                         </button>
-                      )}
-                      <Badge variant={item.task.type === "resolution" ? "default" : "secondary"}>
-                        {item.task.type}
-                      </Badge>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className={`font-medium text-sm ${
+                              item.status === "completed" ? "line-through text-gray-500" : ""
+                            }`}>
+                              {item.task.name}
+                            </p>
+                            {item.streak && item.streak >= 2 && (
+                              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
+                                <Flame className="h-3 w-3" />
+                                {item.streak}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {format(parseISO(item.startTime), "h:mm a")} - {format(parseISO(item.endTime), "h:mm a")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {item.status === "completed" && (
+                          <button
+                            onClick={() => updateTaskStatus(item.id, "pending")}
+                            className="p-1 text-gray-400 hover:text-blue-600"
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </button>
+                        )}
+                        <Badge variant={item.task.type === "resolution" ? "default" : "secondary"} className="text-xs">
+                          {item.task.type === "resolution" ? "Focus" : "Life Admin"}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No tasks scheduled for today</p>
-                <Button
-                  variant="link"
-                  className="mt-2"
-                  onClick={generateSchedule}
-                  disabled={generating}
-                >
-                  Generate a schedule
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Add / Task Summary */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Your Tasks</CardTitle>
-              <CardDescription>Resolution and household tasks</CardDescription>
-            </div>
-            <Target className="h-5 w-5 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <Link href="/tasks?type=resolution" className="block">
-                <div className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors cursor-pointer">
-                  <Target className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-blue-600">{stats?.resolutionTasks || 0}</p>
-                  <p className="text-sm text-blue-600">Resolutions</p>
+                  ))}
                 </div>
-              </Link>
-              <Link href="/tasks?type=household" className="block">
-                <div className="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100 transition-colors cursor-pointer">
-                  <Home className="h-6 w-6 text-green-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-green-600">{stats?.householdTasks || 0}</p>
-                  <p className="text-sm text-green-600">Household</p>
+              ) : (
+                <div className="text-center py-8">
+                  <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Your day is clear</p>
+                  <p className="text-gray-400 text-xs mb-2">Let AI find time for what matters</p>
+                  <Button variant="link" size="sm" onClick={generateSchedule} disabled={generating}>
+                    Optimize my week
+                  </Button>
                 </div>
-              </Link>
-            </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-            <Link href="/tasks">
-              <Button className="w-full" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Task
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        {/* Right Column - Weekly Plan & Health */}
+        <div className="space-y-6">
+          <CollapsibleWeeklyPlan
+            onGenerateSchedule={generateSchedule}
+            generating={generating}
+          />
+          <ScheduleHealthWidget />
+        </div>
       </div>
 
-      {/* Task Feedback Dialog */}
-      {/* Task Action Dialog (Learning Control) */}
+      {/* Task Action Dialog */}
       {actionTask && (
         <TaskActionDialog
           isOpen={actionDialogOpen}
@@ -660,6 +492,7 @@ export default function DashboardPage() {
         />
       )}
 
+      {/* Feedback Dialog */}
       {feedbackTask && (
         <TaskFeedbackDialog
           open={showFeedback}
@@ -667,9 +500,7 @@ export default function DashboardPage() {
           scheduledTaskId={feedbackTask.id}
           taskName={feedbackTask.task.name}
           scheduledDuration={feedbackTask.task.duration}
-          onSubmit={() => {
-            setFeedbackTask(null);
-          }}
+          onSubmit={() => setFeedbackTask(null)}
         />
       )}
     </div>
