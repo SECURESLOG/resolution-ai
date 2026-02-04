@@ -60,6 +60,7 @@ model User {
   userPreferences      UserPreference[]
   notifications        Notification[]
   weeklyPlanApprovals  WeeklyPlanApproval[]
+  onboarding           OnboardingProgress?
 }
 
 model ExternalCalendar {
@@ -444,6 +445,23 @@ model AIRecommendation {
 }
 
 // Notification queue for reminders and agent messages
+// Onboarding progress tracking
+model OnboardingProgress {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  calendarConnected       Boolean   @default(false)
+  firstTaskCreated        Boolean   @default(false)
+  firstScheduleGenerated  Boolean   @default(false)
+  firstFeedbackGiven      Boolean   @default(false)
+  skippedAt               DateTime? // When user clicked "skip for now"
+  completedAt             DateTime? // When all steps were completed
+  currentStep             Int       @default(1) // 1-4 for progress tracking
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Notification {
   id           String    @id @default(cuid())
   userId       String

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { TaskFeedbackDialog } from "@/components/feedback/task-feedback-dialog";
 import { TaskActionDialog } from "@/components/tasks/task-action-dialog";
 import { WeeklyProgress } from "@/components/dashboard/weekly-progress";
 import { DailyInsight } from "@/components/dashboard/daily-insight";
+import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import {
   Calendar,
   CheckCircle,
@@ -66,6 +68,7 @@ interface ScheduledTask {
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [todaySchedule, setTodaySchedule] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,11 +77,41 @@ export default function DashboardPage() {
   const [approving, setApproving] = useState(false);
   const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [onboardingKey, setOnboardingKey] = useState(0);
 
   // Task action dialog state (for learning control)
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionTask, setActionTask] = useState<ScheduledTask | null>(null);
   const [pendingAction, setPendingAction] = useState<"complete" | "skip">("complete");
+
+  // Onboarding step handlers
+  const handleOnboardingStepClick = useCallback((step: string) => {
+    if (step === "calendar") {
+      router.push("/settings");
+    } else if (step === "task") {
+      router.push("/tasks");
+    } else if (step === "feedback") {
+      // Find a completed task to give feedback on
+      const completedTask = todaySchedule.find(t => t.status === "completed");
+      if (completedTask) {
+        setFeedbackTask(completedTask);
+        setShowFeedback(true);
+      } else {
+        router.push("/calendar");
+      }
+    }
+  }, [router, todaySchedule]);
+
+  const handleOnboardingGenerateSchedule = useCallback(async (type: "task" | "week") => {
+    if (type === "week") {
+      await generateSchedule();
+    } else {
+      // For single task, use the AI assistant
+      router.push("/assistant");
+    }
+    // Refresh onboarding state after generating
+    setOnboardingKey(prev => prev + 1);
+  }, [router]);
 
   useEffect(() => {
     fetchData();
@@ -247,6 +280,13 @@ export default function DashboardPage() {
           )}
         </Button>
       </div>
+
+      {/* Onboarding Checklist */}
+      <OnboardingChecklist
+        key={onboardingKey}
+        onStepClick={handleOnboardingStepClick}
+        onGenerateSchedule={handleOnboardingGenerateSchedule}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

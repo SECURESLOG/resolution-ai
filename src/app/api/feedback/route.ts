@@ -92,6 +92,13 @@ export async function POST(request: NextRequest) {
     // Update user preferences based on feedback (simple learning)
     await updateUserPreferences(session.user.id, scheduledTask, data);
 
+    // Update onboarding progress - first feedback given
+    await prisma.onboardingProgress.upsert({
+      where: { userId: session.user.id },
+      update: { firstFeedbackGiven: true },
+      create: { userId: session.user.id, firstFeedbackGiven: true },
+    });
+
     return NextResponse.json({ feedback }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

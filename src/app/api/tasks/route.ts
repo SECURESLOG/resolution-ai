@@ -109,6 +109,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Update onboarding progress - first task created
+    await prisma.onboardingProgress.upsert({
+      where: { userId: session.user.id },
+      update: { firstTaskCreated: true },
+      create: { userId: session.user.id, firstTaskCreated: true },
+    });
+
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

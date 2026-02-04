@@ -13,6 +13,7 @@ import {
   CheckCircle,
   AlertCircle,
   Wrench,
+  Rocket,
 } from "lucide-react";
 
 interface Message {
@@ -21,6 +22,14 @@ interface Message {
   content: string;
   toolsUsed?: string[];
   timestamp: Date;
+}
+
+interface OnboardingState {
+  calendarConnected: boolean;
+  firstTaskCreated: boolean;
+  firstScheduleGenerated: boolean;
+  isComplete: boolean;
+  currentStep: number;
 }
 
 interface AgentChatProps {
@@ -33,8 +42,25 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
   const [input, setInput] = useState(initialMessage || "");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch onboarding state
+  useEffect(() => {
+    const fetchOnboarding = async () => {
+      try {
+        const response = await fetch("/api/onboarding");
+        if (response.ok) {
+          const data = await response.json();
+          setOnboarding(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch onboarding:", error);
+      }
+    };
+    fetchOnboarding();
+  }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -120,13 +146,70 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
     }
   };
 
-  const suggestedPrompts = [
-    "Schedule gym for tomorrow morning",
-    "What tasks do I have this week?",
-    "Find time for grocery shopping",
-    "Is the task distribution fair?",
-    "Show me my free time slots today",
-  ];
+  // Different prompts based on onboarding state
+  const getWelcomeContent = () => {
+    if (!onboarding || onboarding.isComplete) {
+      return {
+        title: "How can I help you today?",
+        subtitle:
+          "I can help you schedule tasks, find free time, check your calendar, and make sure chores are fairly distributed.",
+        prompts: [
+          "Schedule gym for tomorrow morning",
+          "What tasks do I have this week?",
+          "Find time for grocery shopping",
+          "Is the task distribution fair?",
+          "Show me my free time slots today",
+        ],
+      };
+    }
+
+    // New user - not yet created a task
+    if (!onboarding.firstTaskCreated) {
+      return {
+        title: "Welcome! I'm your AI scheduling assistant",
+        subtitle:
+          "I see you've connected your calendar. Let's add your first goal! Just tell me what you want to achieve, and I'll find the perfect time for it.",
+        prompts: [
+          "I want to exercise 3 times this week",
+          "Help me find time to read every day",
+          "Schedule meal prep for Sunday",
+          "I need to practice guitar for 30 minutes daily",
+        ],
+        isOnboarding: true,
+      };
+    }
+
+    // Has tasks but no schedule generated
+    if (!onboarding.firstScheduleGenerated) {
+      return {
+        title: "Great! You've added tasks",
+        subtitle:
+          "Now let's find the perfect time slots. I'll look at your calendar and suggest optimal times based on your schedule.",
+        prompts: [
+          "Generate my schedule for this week",
+          "When's the best time for my tasks?",
+          "Schedule all my pending tasks",
+          "Find free time in my calendar",
+        ],
+        isOnboarding: true,
+      };
+    }
+
+    // Default
+    return {
+      title: "How can I help you today?",
+      subtitle:
+        "I can help you schedule tasks, find free time, check your calendar, and make sure chores are fairly distributed.",
+      prompts: [
+        "Schedule gym for tomorrow morning",
+        "What tasks do I have this week?",
+        "Find time for grocery shopping",
+        "Show me my free time slots today",
+      ],
+    };
+  };
+
+  const welcomeContent = getWelcomeContent();
 
   return (
     <Card className="flex flex-col h-[600px]">
@@ -144,25 +227,39 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <Bot className="h-16 w-16 text-gray-300 mb-4" />
+              {welcomeContent.isOnboarding ? (
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4">
+                  <Rocket className="h-8 w-8 text-white" />
+                </div>
+              ) : (
+                <Bot className="h-16 w-16 text-gray-300 mb-4" />
+              )}
               <h3 className="text-lg font-medium text-gray-700 mb-2">
-                How can I help you today?
+                {welcomeContent.title}
               </h3>
               <p className="text-sm text-gray-500 mb-6 max-w-md">
-                I can help you schedule tasks, find free time, check your
-                calendar, and make sure chores are fairly distributed.
+                {welcomeContent.subtitle}
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {suggestedPrompts.map((prompt, i) => (
+                {welcomeContent.prompts.map((prompt, i) => (
                   <button
                     key={i}
                     onClick={() => setInput(prompt)}
-                    className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition-colors"
+                    className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
+                      welcomeContent.isOnboarding
+                        ? "bg-blue-100 hover:bg-blue-200 text-blue-700 border border-blue-200"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    }`}
                   >
                     {prompt}
                   </button>
                 ))}
               </div>
+              {welcomeContent.isOnboarding && (
+                <p className="text-xs text-gray-400 mt-4">
+                  Tip: Just type naturally - I understand plain English!
+                </p>
+              )}
             </div>
           )}
 

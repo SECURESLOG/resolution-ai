@@ -240,6 +240,15 @@ export async function POST(request: NextRequest) {
 
     const successCount = results.filter((r) => r.success).length;
 
+    // Update onboarding progress - first schedule generated
+    if (successCount > 0) {
+      await prisma.onboardingProgress.upsert({
+        where: { userId: session.user.id },
+        update: { firstScheduleGenerated: true },
+        create: { userId: session.user.id, firstScheduleGenerated: true },
+      });
+    }
+
     let message = `Successfully scheduled ${successCount} of ${validatedRecommendations.length} tasks`;
     if (filteredCount > 0) {
       message += ` (${filteredCount} tasks were filtered due to scheduling constraints)`;
