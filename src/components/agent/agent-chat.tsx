@@ -150,15 +150,15 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
   const getWelcomeContent = () => {
     if (!onboarding || onboarding.isComplete) {
       return {
-        title: "How can I help you today?",
+        title: "What can I help you reclaim time for?",
         subtitle:
-          "I can help you schedule tasks, find free time, check your calendar, and make sure chores are fairly distributed.",
+          "I protect your focus time, balance your workload, and handle the scheduling decisions so you don't have to.",
         prompts: [
-          "Schedule gym for tomorrow morning",
-          "What tasks do I have this week?",
-          "Find time for grocery shopping",
-          "Is the task distribution fair?",
-          "Show me my free time slots today",
+          "Find 2 hours of focus time this week",
+          "What's overloading my schedule?",
+          "Block time for weekly planning",
+          "Balance life admin with my partner",
+          "Show me where my time goes",
         ],
       };
     }
@@ -166,14 +166,14 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
     // New user - not yet created a task
     if (!onboarding.firstTaskCreated) {
       return {
-        title: "Welcome! I'm your AI scheduling assistant",
+        title: "I'm here to eliminate your scheduling stress",
         subtitle:
-          "I see you've connected your calendar. Let's add your first goal! Just tell me what you want to achieve, and I'll find the perfect time for it.",
+          "Tell me what's competing for your time - goals, routines, or life admin. I'll find the best slots automatically.",
         prompts: [
-          "I want to exercise 3 times this week",
-          "Help me find time to read every day",
-          "Schedule meal prep for Sunday",
-          "I need to practice guitar for 30 minutes daily",
+          "I need time for focused work",
+          "Help me fit in exercise 3x/week",
+          "I never have time for meal prep",
+          "Weekly budget review keeps getting skipped",
         ],
         isOnboarding: true,
       };
@@ -182,14 +182,14 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
     // Has tasks but no schedule generated
     if (!onboarding.firstScheduleGenerated) {
       return {
-        title: "Great! You've added tasks",
+        title: "Ready to optimize your week?",
         subtitle:
-          "Now let's find the perfect time slots. I'll look at your calendar and suggest optimal times based on your schedule.",
+          "I'll analyze your calendar, find the best time slots, and protect your focus time. No more decision fatigue.",
         prompts: [
-          "Generate my schedule for this week",
-          "When's the best time for my tasks?",
-          "Schedule all my pending tasks",
-          "Find free time in my calendar",
+          "Optimize my entire week",
+          "Where's my best focus time?",
+          "Schedule everything intelligently",
+          "Show me my actual free time",
         ],
         isOnboarding: true,
       };
@@ -197,14 +197,14 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
 
     // Default
     return {
-      title: "How can I help you today?",
+      title: "What can I help you reclaim time for?",
       subtitle:
-        "I can help you schedule tasks, find free time, check your calendar, and make sure chores are fairly distributed.",
+        "I protect your focus time, balance your workload, and handle the scheduling decisions so you don't have to.",
       prompts: [
-        "Schedule gym for tomorrow morning",
-        "What tasks do I have this week?",
-        "Find time for grocery shopping",
-        "Show me my free time slots today",
+        "Find focus time for deep work",
+        "What's taking up my time this week?",
+        "Block time for planning",
+        "Am I overcommitted this week?",
       ],
     };
   };
@@ -218,7 +218,7 @@ export function AgentChat({ initialMessage, onTaskScheduled }: AgentChatProps) {
           <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
-          Family AI Assistant
+          Your Productivity AI
         </CardTitle>
       </CardHeader>
 

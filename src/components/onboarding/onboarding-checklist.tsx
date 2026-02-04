@@ -118,32 +118,32 @@ export function OnboardingChecklist({
   const steps = [
     {
       id: "calendar",
-      label: "Connect Google Calendar",
-      description: "Import your existing events",
+      label: "Connect your calendars",
+      description: "Show AI where your time goes",
       icon: Calendar,
       complete: progress.calendarConnected,
       action: () => onStepClick?.("calendar"),
     },
     {
       id: "task",
-      label: "Add your first goal",
-      description: "What do you want to achieve?",
+      label: "Add what needs scheduling",
+      description: "Goals, routines, or life admin",
       icon: ListTodo,
       complete: progress.firstTaskCreated,
       action: () => onStepClick?.("task"),
     },
     {
       id: "schedule",
-      label: "Generate AI schedule",
-      description: "Let AI find the best time",
+      label: "Let AI optimize your week",
+      description: "Find time without the mental load",
       icon: Sparkles,
       complete: progress.firstScheduleGenerated,
       action: () => setShowScheduleOptions(true),
     },
     {
       id: "feedback",
-      label: "Give feedback on a task",
-      description: "Help AI learn your preferences",
+      label: "Tell AI how it went",
+      description: "Improve scheduling accuracy",
       icon: MessageSquare,
       complete: progress.firstFeedbackGiven,
       action: () => onStepClick?.("feedback"),
@@ -265,7 +265,7 @@ export function OnboardingChecklist({
                     !step.complete && (
                       <div className="ml-8 mt-2 p-3 bg-white rounded-lg border border-gray-200 space-y-2">
                         <p className="text-sm text-gray-600 mb-3">
-                          How would you like to generate your schedule?
+                          How should AI organize your time?
                         </p>
                         <Button
                           size="sm"
@@ -276,7 +276,7 @@ export function OnboardingChecklist({
                           }}
                         >
                           <Sparkles className="h-4 w-4 mr-2" />
-                          Schedule my first task
+                          Find time for one task
                         </Button>
                         <Button
                           size="sm"
@@ -288,7 +288,7 @@ export function OnboardingChecklist({
                           }}
                         >
                           <Calendar className="h-4 w-4 mr-2" />
-                          Generate my whole week
+                          Optimize my entire week
                         </Button>
                         <button
                           onClick={() => setShowScheduleOptions(false)}
@@ -307,18 +307,17 @@ export function OnboardingChecklist({
           <div className="mt-4 pt-3 border-t border-white/50">
             <p className="text-sm text-gray-600 text-center">
               {progress.completedCount === 0 && (
-                <>Let&apos;s get your AI assistant set up!</>
+                <>Let&apos;s eliminate your scheduling stress!</>
               )}
               {progress.completedCount === 1 && (
-                <>Great start! Add a goal to see AI scheduling in action.</>
+                <>Great! Now add what&apos;s competing for your time.</>
               )}
               {progress.completedCount === 2 && (
-                <>Almost there! Generate your first AI schedule.</>
+                <>Let AI find the optimal times - no more decision fatigue.</>
               )}
               {progress.completedCount === 3 && (
                 <>
-                  One more step! Complete a task and give feedback to help AI
-                  learn.
+                  Last step! Your feedback helps AI learn your productivity patterns.
                 </>
               )}
             </p>

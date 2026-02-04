@@ -41,51 +41,51 @@ export default function LandingPage() {
   const features = [
     {
       icon: MessageSquare,
-      title: "AI Assistant",
-      description: "Chat naturally to schedule tasks, resolve conflicts, and get personalized recommendations.",
+      title: "Eliminate Decision Fatigue",
+      description: "Stop wasting mental energy deciding when to do things. AI finds the optimal time automatically.",
     },
     {
       icon: Brain,
-      title: "Learns Your Patterns",
-      description: "AI learns from your feedback - your energy levels, preferred times, and task completion patterns.",
+      title: "Learns Your Productivity Patterns",
+      description: "AI learns when you're most focused, when you need breaks, and adapts your schedule accordingly.",
     },
     {
       icon: Calendar,
-      title: "Smart Scheduling",
-      description: "Automatically finds optimal time slots based on your calendar, preferences, and energy patterns.",
+      title: "Protect Your Focus Time",
+      description: "Automatically blocks time for deep work and prevents calendar overload before it happens.",
     },
     {
       icon: Users,
-      title: "Family Coordination",
-      description: "Fair task distribution between family members with workload balancing and conflict detection.",
+      title: "Work-Life Balance",
+      description: "Fair distribution of life admin between family members. Stop carrying the mental load alone.",
     },
     {
       icon: TrendingUp,
-      title: "Weekly Planning",
-      description: "AI-generated weekly plans that adapt to your schedule and priorities.",
+      title: "Automated Weekly Planning",
+      description: "Start each week with an optimized schedule. No more Sunday night planning anxiety.",
     },
     {
       icon: Heart,
-      title: "Burnout Prevention",
-      description: "Monitors your workload and suggests rest when you're at risk of burnout.",
+      title: "Prevent Burnout",
+      description: "Monitors your schedule health and warns you before you overcommit. Protect your energy.",
     },
   ];
 
   const capabilities = [
     {
       icon: Clock,
-      title: "Focus Timer",
-      description: "Built-in Pomodoro timer with AI-suggested focus sessions based on your task priorities.",
+      title: "Time Reclaimed",
+      description: "See exactly how much time AI saves you from planning and decision-making each week.",
     },
     {
       icon: Zap,
-      title: "Smart Reminders",
-      description: "Context-aware reminders that consider traffic, weather, and your patterns.",
+      title: "Drag & Drop Scheduling",
+      description: "Quickly reschedule with smart conflict detection. AI warns you before you overbook.",
     },
     {
       icon: BarChart3,
-      title: "Your AI - Full Transparency",
-      description: "See exactly what your AI learns, control what it remembers, and watch it improve over time.",
+      title: "AI Transparency Dashboard",
+      description: "See what your AI learned, why it makes suggestions, and control what it remembers.",
     },
   ];
 
@@ -101,16 +101,16 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Your AI-Powered{" "}
+            Take Back Control{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-              Resolution Partner
+              of Your Time
             </span>
           </h1>
 
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            ResolutionAI learns your patterns, understands your energy levels, and intelligently schedules
-            your goals around your busy life. Chat with AI to manage tasks, prevent burnout, and finally
-            achieve your New Year resolutions.
+            Stop drowning in decisions about when to do what. ResolutionAI eliminates scheduling
+            stress, protects your focus time, and balances work with life admin. Let AI handle
+            the mental load so you can finally be productive without the burnout.
           </p>
 
           <Button
@@ -131,10 +131,10 @@ export default function LandingPage() {
       {/* Features Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h2 className="text-3xl font-bold text-center mb-4">
-          AI That Actually Understands You
+          Built for Busy People Who Want Balance
         </h2>
         <p className="text-gray-600 text-center max-w-2xl mx-auto mb-12">
-          Not just another scheduling app. ResolutionAI learns from every interaction to become your personal productivity partner.
+          Not just another to-do app. ResolutionAI actively manages your time, protects your energy, and makes productivity sustainable.
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -164,9 +164,9 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 1
               </div>
-              <h3 className="text-xl font-semibold mb-2">Connect</h3>
+              <h3 className="text-xl font-semibold mb-2">Connect Calendars</h3>
               <p className="text-gray-600">
-                Sign in with Google and import your calendars. AI sees your availability instantly.
+                Import work and personal calendars. AI instantly sees where your time goes.
               </p>
             </div>
 
@@ -174,9 +174,9 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-purple-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 2
               </div>
-              <h3 className="text-xl font-semibold mb-2">Tell AI Your Goals</h3>
+              <h3 className="text-xl font-semibold mb-2">Add What Matters</h3>
               <p className="text-gray-600">
-                Chat naturally: &quot;Schedule gym 3x this week&quot; or &quot;Find time for reading&quot;.
+                Tell AI your goals and life admin. &quot;Weekly planning&quot;, &quot;Inbox zero&quot;, &quot;Meal prep&quot;.
               </p>
             </div>
 
@@ -184,9 +184,9 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-green-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 3
               </div>
-              <h3 className="text-xl font-semibold mb-2">AI Learns</h3>
+              <h3 className="text-xl font-semibold mb-2">AI Optimizes</h3>
               <p className="text-gray-600">
-                Give feedback after tasks. AI learns your energy patterns and optimal times.
+                AI finds the best times, protects focus blocks, and balances your workload automatically.
               </p>
             </div>
 
@@ -194,9 +194,9 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-orange-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 4
               </div>
-              <h3 className="text-xl font-semibold mb-2">Achieve More</h3>
+              <h3 className="text-xl font-semibold mb-2">Reclaim Your Time</h3>
               <p className="text-gray-600">
-                Watch your completion rates improve as AI optimizes your schedule over time.
+                Stop stressing about scheduling. Focus on doing, not deciding when to do.
               </p>
             </div>
           </div>
@@ -228,20 +228,20 @@ export default function LandingPage() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 py-16">
         <div className="max-w-4xl mx-auto px-4 text-center text-white">
           <h2 className="text-3xl font-bold mb-8">
-            The AI That Gets Smarter With You
+            AI That Learns Your Productivity Style
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <div className="text-4xl font-bold mb-2">6+</div>
-              <div className="text-blue-100">Learned Preferences Per User</div>
+              <div className="text-4xl font-bold mb-2">2hrs+</div>
+              <div className="text-blue-100">Planning Time Saved Weekly</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2">85%</div>
-              <div className="text-blue-100">Schedule Adherence Rate</div>
+              <div className="text-blue-100">Tasks Completed On Schedule</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">24/7</div>
-              <div className="text-blue-100">AI Assistant Available</div>
+              <div className="text-4xl font-bold mb-2">0</div>
+              <div className="text-blue-100">Decisions About When To Do What</div>
             </div>
           </div>
         </div>
@@ -251,10 +251,10 @@ export default function LandingPage() {
       <div className="py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">
-            Ready to Finally Achieve Your Goals?
+            Ready to Stop Drowning in Decisions?
           </h2>
           <p className="text-xl text-gray-600 mb-8">
-            Let AI handle the scheduling so you can focus on what matters most.
+            Let AI handle the mental load of scheduling so you can focus on actually getting things done.
           </p>
           <Button
             size="lg"
