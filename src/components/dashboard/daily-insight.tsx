@@ -2,7 +2,44 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, RefreshCw, Loader2 } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Info, X } from "lucide-react";
+
+function InfoButton({ info }: { info: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 rounded-full hover:bg-white/50 transition-colors"
+        aria-label="More information"
+      >
+        <Info className="h-3.5 w-3.5 text-purple-400 hover:text-purple-600" />
+      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute left-0 top-8 z-50 w-72 p-3 bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-600">{info}</p>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-0.5 rounded hover:bg-gray-100"
+              >
+                <X className="h-3 w-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 interface InsightData {
   insight: string;
@@ -73,9 +110,12 @@ export function DailyInsight() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">
-                AI Daily Insight
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">
+                  AI Daily Insight
+                </p>
+                <InfoButton info="AI-generated personalized insight based on your schedule, completion patterns, and preferences. Refreshes daily to give you relevant motivation and tips." />
+              </div>
               <button
                 onClick={() => fetchInsight(true)}
                 disabled={refreshing}

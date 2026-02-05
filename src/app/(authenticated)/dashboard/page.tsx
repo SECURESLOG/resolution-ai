@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Loader2,
   Undo2,
+  Info,
+  X,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { AIScheduleResponse, ScheduleRecommendation } from "@/types";
@@ -261,12 +263,16 @@ export default function DashboardPage() {
       <div className="grid grid-cols-4 gap-3">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50">
           <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-600">Today&apos;s Progress</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-gray-600">Today&apos;s Progress</p>
+                  <InfoButton info="Shows how many tasks you've completed today out of your total scheduled tasks. Completing tasks helps the AI learn your preferences." />
+                </div>
                 <p className="text-xl font-bold text-blue-700">
                   {stats?.completedToday || 0}/{stats?.todayTasks || 0}
                 </p>
+                <p className="text-xs text-gray-400 mt-1">Tasks done today</p>
               </div>
               <CheckCircle className="h-8 w-8 text-blue-500/30" />
             </div>
@@ -275,12 +281,16 @@ export default function DashboardPage() {
 
         <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50">
           <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-600">Week&apos;s Progress</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-gray-600">Week&apos;s Progress</p>
+                  <InfoButton info="Tracks your overall progress for the current week. This helps you see if you're on track to meet your weekly goals." />
+                </div>
                 <p className="text-xl font-bold text-purple-700">
                   {stats?.completedWeek || 0}/{stats?.weekTasks || 0}
                 </p>
+                <p className="text-xs text-gray-400 mt-1">Weekly completion</p>
               </div>
               <Calendar className="h-8 w-8 text-purple-500/30" />
             </div>
@@ -289,10 +299,14 @@ export default function DashboardPage() {
 
         <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50">
           <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-600">Consistency</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-gray-600">Consistency</p>
+                  <InfoButton info="Your current streak of consecutive days with completed tasks. Building consistency helps form lasting habits." />
+                </div>
                 <p className="text-xl font-bold text-orange-700">{stats?.streakDays || 0} days</p>
+                <p className="text-xs text-gray-400 mt-1">Days in a row active</p>
               </div>
               <Flame className="h-8 w-8 text-orange-500/30" />
             </div>
@@ -301,10 +315,14 @@ export default function DashboardPage() {
 
         <Card className="bg-gradient-to-br from-green-50 to-green-100/50">
           <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-600">Follow-through</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-gray-600">Follow-through</p>
+                  <InfoButton info="The percentage of scheduled tasks you've completed vs skipped. Higher follow-through means better schedule adherence and helps AI make better predictions." />
+                </div>
                 <p className="text-xl font-bold text-green-700">{stats?.completionRate || 0}%</p>
+                <p className="text-xs text-gray-400 mt-1">Tasks completed vs skipped</p>
               </div>
               <Target className="h-8 w-8 text-green-500/30" />
             </div>
@@ -326,6 +344,7 @@ export default function DashboardPage() {
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="h-5 w-5 text-blue-600" />
                   AI Found Time For You
+                  <InfoButton info="AI has analyzed your calendar and found optimal time slots for your tasks. Review the suggestions and click 'Lock It In' to add them to your schedule." />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -383,7 +402,10 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center justify-between">
-                <span>Today&apos;s Schedule</span>
+                <div className="flex items-center gap-2">
+                  <span>Today&apos;s Schedule</span>
+                  <InfoButton info="Your tasks scheduled for today. Click the circle to mark complete, or click the task to see details. The AI learns from your completions to improve future scheduling." />
+                </div>
                 <Link href="/schedule">
                   <Button variant="ghost" size="sm">View all</Button>
                 </Link>
@@ -502,6 +524,43 @@ export default function DashboardPage() {
           scheduledDuration={feedbackTask.task.duration}
           onSubmit={() => setFeedbackTask(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function InfoButton({ info }: { info: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+        aria-label="More information"
+      >
+        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-8 z-50 w-72 p-3 bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-600">{info}</p>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-0.5 rounded hover:bg-gray-100"
+              >
+                <X className="h-3 w-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

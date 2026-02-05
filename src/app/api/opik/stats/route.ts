@@ -168,14 +168,18 @@ export async function GET() {
       .slice(0, 5);
 
     // === INTELLIGENCE LOOP METRICS ===
-    // Track how preferences have improved scheduling
-    const preferences = await prisma.userPreference.findMany({
-      where: { userId: session.user.id },
+    // Track how preferences have improved scheduling (only count ACTIVE preferences)
+    const activePreferencesCount = await prisma.userPreference.count({
+      where: { userId: session.user.id, isActive: true },
+    });
+
+    const recentPreferences = await prisma.userPreference.findMany({
+      where: { userId: session.user.id, isActive: true },
       orderBy: { updatedAt: "desc" },
       take: 10,
     });
 
-    const learnedPreferences = preferences.map((p) => ({
+    const learnedPreferences = recentPreferences.map((p) => ({
       key: p.key,
       confidence: p.confidence,
       source: p.source,
@@ -256,10 +260,11 @@ export async function GET() {
         ? lastWeekAccuracy - firstWeekAccuracy
         : 0;
 
-    // Count new preferences learned in each time period
+    // Count new ACTIVE preferences learned in each time period
     const preferencesThisMonth = await prisma.userPreference.count({
       where: {
         userId: session.user.id,
+        isActive: true,
         createdAt: { gte: subWeeks(now, 4) },
       },
     });
@@ -267,6 +272,7 @@ export async function GET() {
     const preferencesLastMonth = await prisma.userPreference.count({
       where: {
         userId: session.user.id,
+        isActive: true,
         createdAt: {
           gte: subWeeks(now, 8),
           lt: subWeeks(now, 4),
@@ -297,7 +303,7 @@ export async function GET() {
         })),
       },
       intelligenceLoop: {
-        learnedPreferences: learnedPreferences.length,
+        learnedPreferences: activePreferencesCount,
         preferences: learnedPreferences,
         improvement: Math.round(intelligenceImprovement),
       },

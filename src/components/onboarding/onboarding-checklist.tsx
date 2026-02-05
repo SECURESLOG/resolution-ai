@@ -13,7 +13,45 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Info,
 } from "lucide-react";
+
+function InfoButton({ info }: { info: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 rounded-full hover:bg-white/50 transition-colors"
+        aria-label="More information"
+      >
+        <Info className="h-4 w-4 text-purple-400 hover:text-purple-600" />
+      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-8 z-50 w-72 p-3 bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-600">{info}</p>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-0.5 rounded hover:bg-gray-100"
+              >
+                <X className="h-3 w-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 interface OnboardingProgress {
   calendarConnected: boolean;
@@ -160,6 +198,7 @@ export function OnboardingChecklist({
           <CardTitle className="text-lg flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600" />
             Getting Started
+            <InfoButton info="Complete these steps to set up your ResolutionAI experience. Connect your calendar, add tasks, let AI optimize your schedule, and provide feedback to help AI learn your preferences." />
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">

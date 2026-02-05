@@ -13,6 +13,10 @@ export const dynamic = "force-dynamic";
 const updateSchema = z.object({
   status: z.enum(["pending", "completed", "skipped"]).optional(),
   learningEnabled: z.boolean().optional(),
+  // Rescheduling fields
+  scheduledDate: z.string().optional(), // ISO date string
+  startTime: z.string().optional(), // ISO datetime string
+  endTime: z.string().optional(), // ISO datetime string
 });
 
 export async function PATCH(
@@ -44,15 +48,33 @@ export async function PATCH(
     // Determine if learning should be enabled (default: true, unless explicitly set)
     const shouldLearn = validatedData.learningEnabled !== false;
 
+    // Build update data
+    const updateData: Record<string, unknown> = {
+      learningEnabled: shouldLearn,
+    };
+
+    if (validatedData.status) {
+      updateData.status = validatedData.status;
+    }
+
+    if (validatedData.status === "completed" || validatedData.status === "skipped") {
+      updateData.outcomeRecordedAt = new Date();
+    }
+
+    // Handle rescheduling fields
+    if (validatedData.scheduledDate) {
+      updateData.scheduledDate = new Date(validatedData.scheduledDate);
+    }
+    if (validatedData.startTime) {
+      updateData.startTime = new Date(validatedData.startTime);
+    }
+    if (validatedData.endTime) {
+      updateData.endTime = new Date(validatedData.endTime);
+    }
+
     const updated = await prisma.scheduledTask.update({
       where: { id },
-      data: {
-        ...validatedData,
-        learningEnabled: shouldLearn,
-        outcomeRecordedAt: (validatedData.status === "completed" || validatedData.status === "skipped")
-          ? new Date()
-          : undefined,
-      },
+      data: updateData,
       include: { task: true },
     });
 

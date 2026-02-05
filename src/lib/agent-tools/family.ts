@@ -211,7 +211,7 @@ export async function analyzeFairness(
 
     recommendation = `${overloaded.userName || "One member"} has been assigned ${
       imbalance.difference
-    } more household tasks than ${
+    } more Life Admin tasks than ${
       underloaded.userName || "the other member"
     } over the past ${weeksToAnalyze} weeks. Consider assigning more tasks to ${
       underloaded.userName || "the other member"

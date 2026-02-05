@@ -11,51 +11,87 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Always check current state from actual data
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: {
+        accounts: { where: { provider: "google" }, take: 1 },
+        tasks: { take: 1 },
+        scheduledTasks: { take: 1 },
+        feedback: { take: 1 },
+      },
+    });
+
+    // Calendar is connected if user has a Google account with refresh token
+    const hasCalendarConnected = (user?.accounts?.length || 0) > 0;
+    const hasTaskCreated = (user?.tasks?.length || 0) > 0;
+    const hasScheduleGenerated = (user?.scheduledTasks?.length || 0) > 0;
+    const hasFeedbackGiven = (user?.feedback?.length || 0) > 0;
+
     // Get or create onboarding progress
     let onboarding = await prisma.onboardingProgress.findUnique({
       where: { userId: session.user.id },
     });
 
     if (!onboarding) {
-      // Check current state to initialize correctly
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        include: {
-          tasks: { take: 1 },
-          scheduledTasks: { take: 1 },
-          feedback: { take: 1 },
-        },
-      });
-
       onboarding = await prisma.onboardingProgress.create({
         data: {
           userId: session.user.id,
-          calendarConnected: user?.calendarConnected || false,
-          firstTaskCreated: (user?.tasks?.length || 0) > 0,
-          firstScheduleGenerated: (user?.scheduledTasks?.length || 0) > 0,
-          firstFeedbackGiven: (user?.feedback?.length || 0) > 0,
+          calendarConnected: hasCalendarConnected,
+          firstTaskCreated: hasTaskCreated,
+          firstScheduleGenerated: hasScheduleGenerated,
+          firstFeedbackGiven: hasFeedbackGiven,
           currentStep: calculateCurrentStep(
-            user?.calendarConnected || false,
-            (user?.tasks?.length || 0) > 0,
-            (user?.scheduledTasks?.length || 0) > 0,
-            (user?.feedback?.length || 0) > 0
+            hasCalendarConnected,
+            hasTaskCreated,
+            hasScheduleGenerated,
+            hasFeedbackGiven
           ),
         },
       });
+    } else {
+      // Sync onboarding with actual state if out of date
+      const needsUpdate =
+        onboarding.calendarConnected !== hasCalendarConnected ||
+        onboarding.firstTaskCreated !== hasTaskCreated ||
+        onboarding.firstScheduleGenerated !== hasScheduleGenerated ||
+        onboarding.firstFeedbackGiven !== hasFeedbackGiven;
+
+      if (needsUpdate) {
+        onboarding = await prisma.onboardingProgress.update({
+          where: { userId: session.user.id },
+          data: {
+            calendarConnected: hasCalendarConnected,
+            firstTaskCreated: hasTaskCreated,
+            firstScheduleGenerated: hasScheduleGenerated,
+            firstFeedbackGiven: hasFeedbackGiven,
+            currentStep: calculateCurrentStep(
+              hasCalendarConnected,
+              hasTaskCreated,
+              hasScheduleGenerated,
+              hasFeedbackGiven
+            ),
+          },
+        });
+      }
     }
 
     // Calculate completion percentage
     const steps = [
-      onboarding.calendarConnected,
-      onboarding.firstTaskCreated,
-      onboarding.firstScheduleGenerated,
-      onboarding.firstFeedbackGiven,
+      hasCalendarConnected,
+      hasTaskCreated,
+      hasScheduleGenerated,
+      hasFeedbackGiven,
     ];
     const completedCount = steps.filter(Boolean).length;
     const isComplete = completedCount === 4;
 
     return NextResponse.json({
       ...onboarding,
+      calendarConnected: hasCalendarConnected,
+      firstTaskCreated: hasTaskCreated,
+      firstScheduleGenerated: hasScheduleGenerated,
+      firstFeedbackGiven: hasFeedbackGiven,
       completedCount,
       totalSteps: 4,
       isComplete,

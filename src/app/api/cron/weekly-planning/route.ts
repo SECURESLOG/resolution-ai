@@ -249,8 +249,8 @@ async function generateWeeklyPlan(
 
 When creating schedules:
 1. Respect each person's learned preferences (preferred times, energy patterns)
-2. Distribute household tasks fairly between family members
-3. Schedule resolution tasks (personal goals) at optimal times for each person
+2. Distribute Life Admin tasks fairly between family members
+3. Schedule Focus Time tasks (personal goals, deep work) at optimal times for each person
 4. Avoid conflicts with existing calendar events
 5. Consider task priorities (1=highest, 4=lowest)
 6. Leave buffer time between tasks
@@ -361,7 +361,7 @@ function buildPlanningPrompt(
   prompt += `## Scheduling Guidelines\n`;
   prompt += `- Working hours: 8:00 AM to 9:00 PM\n`;
   prompt += `- Try to schedule each task 2-3 times during the week for regular practice\n`;
-  prompt += `- For household tasks, distribute fairly between family members\n`;
+  prompt += `- For Life Admin tasks, distribute fairly between family members\n`;
   prompt += `- Avoid scheduling during existing calendar events\n`;
   prompt += `- Consider energy levels: physical tasks earlier, mental tasks when alert\n\n`;
 

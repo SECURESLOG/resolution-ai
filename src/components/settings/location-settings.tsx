@@ -25,6 +25,7 @@ const LOCATION_TYPES = [
   { value: "work", label: "Work", icon: "💼" },
   { value: "gym", label: "Gym", icon: "🏋️" },
   { value: "school", label: "School", icon: "🎓" },
+  { value: "cricket", label: "Cricket/Sports Ground", icon: "🏏" },
   { value: "other", label: "Other", icon: "📍" },
 ];
 

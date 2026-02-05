@@ -219,6 +219,8 @@ async function gatherTaskContext(task: UpcomingTask): Promise<TaskContext> {
       destinationLocation = savedLocations.find((l) => l.type === "work");
     } else if (taskNameLower.includes("school") || taskNameLower.includes("class")) {
       destinationLocation = savedLocations.find((l) => l.type === "school");
+    } else if (taskNameLower.includes("cricket") || taskNameLower.includes("rugby") || taskNameLower.includes("football") || taskNameLower.includes("soccer") || taskNameLower.includes("sports")) {
+      destinationLocation = savedLocations.find((l) => l.type === "cricket");
     }
   }
 
@@ -280,7 +282,7 @@ async function generateSmartReminder(context: TaskContext): Promise<{
   const contextFactors: string[] = [];
 
   // Determine if task is likely outdoor-related
-  const outdoorKeywords = ["gym", "run", "walk", "jog", "cycle", "bike", "hike", "swim", "outdoor", "garden", "yard", "park", "exercise", "workout", "sports", "tennis", "golf", "soccer", "football", "basketball"];
+  const outdoorKeywords = ["gym", "run", "walk", "jog", "cycle", "bike", "hike", "swim", "outdoor", "garden", "yard", "park", "exercise", "workout", "sports", "tennis", "golf", "soccer", "football", "basketball", "cricket", "rugby", "hockey", "baseball", "softball", "lacrosse", "track", "field", "running", "jogging", "cycling", "hiking", "swimming"];
   const isOutdoorTask = outdoorKeywords.some(keyword =>
     task.taskName.toLowerCase().includes(keyword) ||
     (task.category?.toLowerCase().includes(keyword) ?? false)

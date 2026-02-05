@@ -564,7 +564,7 @@ export default function SettingsPage() {
                       Add
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Add External Calendar</DialogTitle>
                       <DialogDescription>
@@ -589,6 +589,26 @@ export default function SettingsPage() {
                           value={newCalendarUrl}
                           onChange={(e) => setNewCalendarUrl(e.target.value)}
                         />
+                      </div>
+
+                      {/* ICS Instructions */}
+                      <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-3">
+                        <p className="font-medium text-gray-700">How to get your calendar ICS link:</p>
+
+                        <div>
+                          <p className="font-medium text-blue-600">Google Calendar</p>
+                          <p className="text-gray-600">Settings → Select calendar → Integrate calendar → Copy &quot;Secret address in iCal format&quot;</p>
+                        </div>
+
+                        <div>
+                          <p className="font-medium text-blue-600">Microsoft Outlook/365</p>
+                          <p className="text-gray-600">Settings → Calendar → Shared calendars → Publish a calendar → Select calendar → Create ICS link</p>
+                        </div>
+
+                        <div>
+                          <p className="font-medium text-blue-600">Apple iCloud</p>
+                          <p className="text-gray-600">iCloud.com → Calendar → Share icon next to calendar → Public Calendar → Copy Link</p>
+                        </div>
                       </div>
 
                       <Button
@@ -859,7 +879,7 @@ export default function SettingsPage() {
                   <h4 className="font-medium text-blue-900 mb-2 text-sm">Why create a family?</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
                     <li>• AI considers both calendars when scheduling</li>
-                    <li>• Fair distribution of household tasks</li>
+                    <li>• Balanced distribution of life admin</li>
                     <li>• See each other&apos;s scheduled tasks</li>
                   </ul>
                 </CardContent>
@@ -1011,7 +1031,7 @@ export default function SettingsPage() {
                     <h4 className="font-medium text-green-900 mb-1 text-sm">Family Complete!</h4>
                     <p className="text-sm text-green-800">
                       When you generate a schedule, the AI will consider both calendars
-                      and fairly distribute household tasks.
+                      and balance the workload fairly.
                     </p>
                   </CardContent>
                 </Card>

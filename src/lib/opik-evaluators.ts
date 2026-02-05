@@ -4,6 +4,9 @@ import { opikClient, addEvaluations, EvaluationScore } from "./opik";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+
 // Helper to call Claude for evaluation
 async function callClaudeForEvaluation(prompt: string): Promise<string> {
   const response = await fetch(ANTHROPIC_API_URL, {
@@ -27,6 +30,34 @@ async function callClaudeForEvaluation(prompt: string): Promise<string> {
   const result = await response.json();
   const textContent = result.content.find((c: { type: string }) => c.type === "text");
   return textContent?.text || "";
+}
+
+// Helper to call OpenAI for evaluation (used as independent judge)
+async function callOpenAIForEvaluation(prompt: string): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OpenAI API key not configured");
+  }
+
+  const response = await fetch(OPENAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to call OpenAI for evaluation: ${error}`);
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content || "";
 }
 
 // Parse evaluation response in format: SCORE: X/10 | REASON: ...
@@ -115,10 +146,11 @@ RECOMMENDATION: [one actionable suggestion]`;
       name: "llm_evaluation",
       type: "llm",
       input: { prompt },
-      metadata: { model: "claude-sonnet-4-20250514" },
+      metadata: { model: "gpt-4o-mini", provider: "openai" },
     });
 
-    const response = await callClaudeForEvaluation(prompt);
+    // Use OpenAI as an independent judge for burnout risk evaluation
+    const response = await callOpenAIForEvaluation(prompt);
 
     llmSpan.update({ output: { response } });
     llmSpan.end();
@@ -228,7 +260,7 @@ export async function evaluateFamilyFairness(
     })
     .join("\n");
 
-  const prompt = `You are evaluating the fairness of household task distribution in a family.
+  const prompt = `You are evaluating the fairness of Life Admin task distribution in a family.
 
 FAMILY TASK DISTRIBUTION FOR WEEK OF ${distribution.weekStart.toDateString()}:
 
@@ -254,10 +286,11 @@ RECOMMENDATION: [one actionable suggestion for fairer distribution]`;
       name: "llm_evaluation",
       type: "llm",
       input: { prompt },
-      metadata: { model: "claude-sonnet-4-20250514" },
+      metadata: { model: "gpt-4o-mini", provider: "openai" },
     });
 
-    const response = await callClaudeForEvaluation(prompt);
+    // Use OpenAI as an independent judge for family fairness evaluation
+    const response = await callOpenAIForEvaluation(prompt);
 
     llmSpan.update({ output: { response } });
     llmSpan.end();
@@ -382,10 +415,11 @@ CLARITY_SCORE: X/10 | REASON: [explanation]`;
       name: "llm_evaluation",
       type: "llm",
       input: { prompt },
-      metadata: { model: "claude-sonnet-4-20250514" },
+      metadata: { model: "gpt-4o-mini", provider: "openai" },
     });
 
-    const evalResponse = await callClaudeForEvaluation(prompt);
+    // Use OpenAI as an independent judge to evaluate Claude's responses
+    const evalResponse = await callOpenAIForEvaluation(prompt);
 
     llmSpan.update({ output: { response: evalResponse } });
     llmSpan.end();

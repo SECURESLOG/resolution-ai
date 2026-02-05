@@ -18,7 +18,6 @@ import {
   BarChart3,
   ArrowRight,
   Sparkles,
-  Heart,
   Target,
   GitBranch,
   Eye,
@@ -28,6 +27,8 @@ import {
   ChevronUp,
   XCircle,
   RotateCcw,
+  Info,
+  X,
 } from "lucide-react";
 
 interface BurnoutRisk {
@@ -177,15 +178,16 @@ export default function OpikInsightsPage() {
   const [preferencesLoading, setPreferencesLoading] = useState(false);
   const [expandedPreference, setExpandedPreference] = useState<string | null>(null);
   const [updatingPreference, setUpdatingPreference] = useState<string | null>(null);
+  const [preferencesCollapsed, setPreferencesCollapsed] = useState(true);
 
   useEffect(() => {
-    fetchStats();
+    fetchStats(true);
     fetchPreferences();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = async (showLoader = false) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const response = await fetch("/api/opik/stats");
       if (response.ok) {
         const data = await response.json();
@@ -194,7 +196,7 @@ export default function OpikInsightsPage() {
     } catch (error) {
       console.error("Failed to fetch stats:", error);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -222,7 +224,8 @@ export default function OpikInsightsPage() {
         body: JSON.stringify({ isActive: !currentlyActive }),
       });
       if (response.ok) {
-        await fetchPreferences();
+        // Refresh both preferences and stats to update all counts
+        await Promise.all([fetchPreferences(), fetchStats()]);
       }
     } catch (error) {
       console.error("Failed to toggle preference:", error);
@@ -240,7 +243,8 @@ export default function OpikInsightsPage() {
         method: "DELETE",
       });
       if (response.ok) {
-        await fetchPreferences();
+        // Refresh both preferences and stats to update all counts
+        await Promise.all([fetchPreferences(), fetchStats()]);
       }
     } catch (error) {
       console.error("Failed to delete preference:", error);
@@ -261,8 +265,17 @@ export default function OpikInsightsPage() {
       if (response.ok) {
         const result = await response.json();
         setLastEvaluation({ type, result });
-        // Refresh stats after evaluation
-        await fetchStats();
+
+        // Update the stats with the evaluation result for consistency
+        if (type === "burnout_risk" && result.burnoutRisk && stats) {
+          setStats({
+            ...stats,
+            burnoutRisk: {
+              ...stats.burnoutRisk,
+              score: result.burnoutRisk,
+            },
+          });
+        }
       }
     } catch (error) {
       console.error("Evaluation failed:", error);
@@ -279,12 +292,6 @@ export default function OpikInsightsPage() {
     );
   }
 
-  const burnoutColors = {
-    low: "bg-green-100 text-green-800 border-green-200",
-    medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    high: "bg-red-100 text-red-800 border-red-200",
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -298,7 +305,7 @@ export default function OpikInsightsPage() {
             See how your AI learns, what it knows, and control what it remembers
           </p>
         </div>
-        <Button onClick={fetchStats} variant="outline">
+        <Button onClick={() => fetchStats(true)} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -329,46 +336,21 @@ export default function OpikInsightsPage() {
         </CardContent>
       </Card>
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Heart className="h-5 w-5 text-red-500" />}
-          label="Burnout Risk"
-          value={stats?.burnoutRisk.score || "N/A"}
-          className={burnoutColors[stats?.burnoutRisk.score || "low"]}
-        />
-        <StatCard
-          icon={<Target className="h-5 w-5 text-blue-500" />}
-          label="Schedule Adherence"
-          value={`${stats?.scheduleAdherence.rate || 0}%`}
-          subtext={`${stats?.scheduleAdherence.completed}/${stats?.scheduleAdherence.total} tasks`}
-        />
-        <StatCard
-          icon={<Users className="h-5 w-5 text-green-500" />}
-          label="Family Fairness"
-          value={stats?.familyFairness ? `${Math.round(stats.familyFairness.fairnessScore * 100)}%` : "N/A"}
-          subtext={stats?.familyFairness ? `${stats.familyFairness.totalFamilyTasks} family tasks` : "Solo user"}
-        />
-        <StatCard
-          icon={<Brain className="h-5 w-5 text-purple-500" />}
-          label="AI Learning"
-          value={`${stats?.intelligenceLoop.learnedPreferences || 0} prefs`}
-          subtext={`+${stats?.intelligenceLoop.improvement || 0}% improvement`}
-        />
-      </div>
-
       {/* AI Learning Curve - The Hero Section */}
       <Card className="border-2 border-purple-200 bg-gradient-to-br from-white to-purple-50">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
-                AI Learning Curve
-              </CardTitle>
-              <CardDescription>
-                Watch the AI get smarter at scheduling your tasks over time
-              </CardDescription>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <TrendingUp className="h-6 w-6 text-purple-600" />
+                  AI Learning Curve
+                </CardTitle>
+                <CardDescription>
+                  Watch the AI get smarter at scheduling your tasks over time
+                </CardDescription>
+              </div>
+              <InfoButton info="This chart shows how accurately the AI predicts your schedule over time. Each bar represents a week - the percentage shows how many tasks you completed vs skipped. Higher percentages mean the AI is learning your preferences well." />
             </div>
             {stats?.learningCurve?.metrics && (
               <div className="text-right">
@@ -516,193 +498,26 @@ export default function OpikInsightsPage() {
         </CardContent>
       </Card>
 
-      {/* Learned Preferences with Evidence Trail */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-purple-600" />
-                Learned Preferences
-              </CardTitle>
-              <CardDescription>
-                What the AI has learned about your scheduling preferences (with full evidence trail)
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchPreferences} disabled={preferencesLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${preferencesLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {preferencesLoading && !preferencesData ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
-            </div>
-          ) : preferencesData?.preferences.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Brain className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-              <p>No preferences learned yet</p>
-              <p className="text-sm">Complete or skip some tasks to help the AI learn!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {preferencesData?.preferences.map((pref) => (
-                <div
-                  key={pref.id}
-                  className={`border rounded-lg overflow-hidden ${
-                    pref.isActive ? "border-purple-200" : "border-gray-200 opacity-60"
-                  }`}
-                >
-                  {/* Preference Header */}
-                  <div
-                    className={`p-4 cursor-pointer ${
-                      pref.isActive ? "bg-purple-50" : "bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      setExpandedPreference(expandedPreference === pref.id ? null : pref.id)
-                    }
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Brain className={`h-4 w-4 ${pref.isActive ? "text-purple-600" : "text-gray-400"}`} />
-                          <span className="font-medium">{pref.taskName}</span>
-                          {!pref.isActive && (
-                            <Badge variant="outline" className="text-xs">Forgotten</Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{pref.insight}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Target className="h-3 w-3" />
-                            {pref.confidence}% confidence
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <BarChart3 className="h-3 w-3" />
-                            {pref.summary.totalEvidence} data points
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3 text-green-600" />
-                            {pref.summary.completedCount} completed
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <XCircle className="h-3 w-3 text-orange-600" />
-                            {pref.summary.skippedCount} skipped
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {expandedPreference === pref.id ? (
-                          <ChevronUp className="h-4 w-4 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded Evidence Trail */}
-                  {expandedPreference === pref.id && (
-                    <div className="border-t border-purple-100">
-                      {/* Action Buttons */}
-                      <div className="p-3 bg-white border-b border-purple-100 flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            togglePreferenceActive(pref.id, pref.isActive);
-                          }}
-                          disabled={updatingPreference === pref.id}
-                        >
-                          {updatingPreference === pref.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                          ) : pref.isActive ? (
-                            <EyeOff className="h-3 w-3 mr-1" />
-                          ) : (
-                            <Eye className="h-3 w-3 mr-1" />
-                          )}
-                          {pref.isActive ? "Forget This" : "Re-enable"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deletePreference(pref.id);
-                          }}
-                          disabled={updatingPreference === pref.id}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete Permanently
-                        </Button>
-                      </div>
-
-                      {/* Evidence List */}
-                      <div className="p-3 bg-white max-h-64 overflow-y-auto">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                          Evidence Trail ({pref.evidence.length} data points)
-                        </p>
-                        <div className="space-y-2">
-                          {pref.evidence.map((ev) => (
-                            <div
-                              key={ev.id}
-                              className="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded"
-                            >
-                              {ev.signalType === "completed" ? (
-                                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                              ) : ev.signalType === "skipped" ? (
-                                <XCircle className="h-4 w-4 text-orange-600 shrink-0" />
-                              ) : (
-                                <RotateCcw className="h-4 w-4 text-blue-600 shrink-0" />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium capitalize">{ev.signalType}</span>
-                                <span className="mx-2 text-gray-400">|</span>
-                                <span className="text-gray-600">
-                                  {new Date(ev.scheduledTime).toLocaleDateString()} at{" "}
-                                  {new Date(ev.scheduledTime).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                                <span className="mx-2 text-gray-400">|</span>
-                                <span className="text-gray-500 capitalize">
-                                  {ev.dayOfWeek} {ev.timeOfDay}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Burnout Risk Evaluator */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  Burnout Risk Evaluator
-                </CardTitle>
-                <CardDescription>
-                  LLM-as-judge evaluates schedule sustainability
-                </CardDescription>
+              <div className="flex items-start gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-500" />
+                    Burnout Risk Evaluator
+                  </CardTitle>
+                  <CardDescription>
+                    LLM-as-judge evaluates schedule sustainability
+                  </CardDescription>
+                </div>
+                <InfoButton info="Uses AI to analyze your weekly schedule and assess burnout risk. Click 'Run Evaluation' to get a detailed assessment of sustainability, work-life balance, and personalized recommendations." />
               </div>
               <Button
+                type="button"
                 size="sm"
                 onClick={() => runEvaluation("burnout_risk")}
                 disabled={evaluating === "burnout_risk"}
@@ -730,10 +545,10 @@ export default function OpikInsightsPage() {
 
             <div className="flex gap-2">
               <Badge variant="outline" className="border-blue-200 text-blue-700">
-                {stats?.burnoutRisk.resolutionTasks || 0} Resolutions
+                {stats?.burnoutRisk.resolutionTasks || 0} Focus
               </Badge>
               <Badge variant="outline" className="border-green-200 text-green-700">
-                {stats?.burnoutRisk.householdTasks || 0} Household
+                {stats?.burnoutRisk.householdTasks || 0} Life Admin
               </Badge>
             </div>
 
@@ -759,93 +574,95 @@ export default function OpikInsightsPage() {
           </CardContent>
         </Card>
 
-        {/* Family Fairness Analyzer */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-green-500" />
-                  Family Fairness Analyzer
-                </CardTitle>
-                <CardDescription>
-                  Evaluates equitable task distribution
-                </CardDescription>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => runEvaluation("family_fairness")}
-                disabled={evaluating === "family_fairness" || !stats?.familyFairness}
-              >
-                {evaluating === "family_fairness" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Zap className="h-4 w-4 mr-2" />
-                )}
-                Run Evaluation
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {stats?.familyFairness ? (
-              <>
-                <div className="space-y-3">
-                  {stats.familyFairness.members.map((member, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <span className="font-medium">{member.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-500">{member.tasks} tasks</span>
-                        <Progress value={(member.tasks / Math.max(...stats.familyFairness!.members.map(m => m.tasks))) * 100} className="w-24" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-700">
-                    Fairness Score: {Math.round(stats.familyFairness.fairnessScore * 100)}%
-                  </p>
-                </div>
-
-                {lastEvaluation?.type === "family_fairness" && (
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="h-4 w-4 text-purple-600" />
-                      <span className="font-medium text-purple-900">Latest Evaluation</span>
-                    </div>
-                    <p className="text-sm text-purple-700">
-                      Equity Score: {Math.round((lastEvaluation.result.equityScore || 0) * 100)}%
-                    </p>
-                    {lastEvaluation.result.imbalances && lastEvaluation.result.imbalances.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-purple-600 font-medium">Imbalances detected:</p>
-                        {lastEvaluation.result.imbalances.map((imb, i) => (
-                          <p key={i} className="text-xs text-purple-600">• {imb.issue}</p>
-                        ))}
-                      </div>
-                    )}
+        {/* Family Fairness Analyzer - Only shown for users with a family */}
+        {stats?.familyFairness && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-green-500" />
+                      Family Fairness Analyzer
+                    </CardTitle>
+                    <CardDescription>
+                      Evaluates equitable task distribution
+                    </CardDescription>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                <p>Join a family to see fairness metrics</p>
+                  <InfoButton info="Analyzes how tasks are distributed among family members. Click 'Run Evaluation' to get AI insights on workload balance and suggestions for fairer distribution." />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => runEvaluation("family_fairness")}
+                  disabled={evaluating === "family_fairness"}
+                >
+                  {evaluating === "family_fairness" ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Zap className="h-4 w-4 mr-2" />
+                  )}
+                  Run Evaluation
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {stats.familyFairness.members.map((member, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span className="font-medium">{member.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">{member.tasks} tasks</span>
+                      <Progress value={(member.tasks / Math.max(...stats.familyFairness!.members.map(m => m.tasks))) * 100} className="w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-700">
+                  Fairness Score: {Math.round(stats.familyFairness.fairnessScore * 100)}%
+                </p>
+              </div>
+
+              {lastEvaluation?.type === "family_fairness" && (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-purple-600" />
+                    <span className="font-medium text-purple-900">Latest Evaluation</span>
+                  </div>
+                  <p className="text-sm text-purple-700">
+                    Equity Score: {Math.round((lastEvaluation.result.equityScore || 0) * 100)}%
+                  </p>
+                  {lastEvaluation.result.imbalances && lastEvaluation.result.imbalances.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-purple-600 font-medium">Imbalances detected:</p>
+                      {lastEvaluation.result.imbalances.map((imb, i) => (
+                        <p key={i} className="text-xs text-purple-600">• {imb.issue}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Cross-Feature Intelligence Loop */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GitBranch className="h-5 w-5 text-purple-500" />
-              Intelligence Propagation Loop
-            </CardTitle>
-            <CardDescription>
-              How insights from one feature improve others
-            </CardDescription>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <GitBranch className="h-5 w-5 text-purple-500" />
+                  Intelligence Propagation Loop
+                </CardTitle>
+                <CardDescription>
+                  How insights from one feature improve others
+                </CardDescription>
+              </div>
+              <InfoButton info="Shows how AI learns from your behavior. When you complete, skip, or reschedule tasks, the AI records these patterns and uses them to improve future scheduling suggestions." />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="relative p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg">
@@ -907,13 +724,18 @@ export default function OpikInsightsPage() {
         {/* AI Coaching Style Consistency */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              AI Coaching Style
-            </CardTitle>
-            <CardDescription>
-              Evaluates tone, helpfulness, and motivation consistency
-            </CardDescription>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-yellow-500" />
+                  AI Coaching Style
+                </CardTitle>
+                <CardDescription>
+                  Evaluates tone, helpfulness, and motivation consistency
+                </CardDescription>
+              </div>
+              <InfoButton info="Measures the quality of AI coaching responses. These scores evaluate how well the AI assistant communicates - from being helpful and clear to providing personalized, motivating guidance." />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
@@ -932,6 +754,17 @@ export default function OpikInsightsPage() {
                 Based on LLM-as-judge evaluation of all AI responses
               </p>
             </div>
+
+            {/* How it works explanation */}
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs font-medium text-gray-700 mb-2">How this evaluation works:</p>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li>• <strong>LLM-as-Judge:</strong> OpenAI (GPT-4o-mini) independently evaluates Claude&apos;s coaching responses</li>
+                <li>• <strong>5 Dimensions:</strong> Each response is scored on tone, helpfulness, personalization, motivation, and clarity</li>
+                <li>• <strong>Cross-Model Evaluation:</strong> Using a different AI provider ensures unbiased, objective assessment</li>
+                <li>• <strong>Continuous Monitoring:</strong> Scores are tracked via Opik to ensure consistent quality over time</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -939,10 +772,15 @@ export default function OpikInsightsPage() {
       {/* Weekly Trends Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-500" />
-            Weekly Performance Trends
-          </CardTitle>
+          <div className="flex items-start gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-500" />
+                Weekly Performance Trends
+              </CardTitle>
+            </div>
+            <InfoButton info="Shows your task completion rate over the past 4 weeks. Blue bars indicate adherence rate (tasks completed vs scheduled). Orange circles show scheduling conflicts that occurred each week." />
+          </div>
           <CardDescription>
             Tracking schedule adherence and conflicts over time
           </CardDescription>
@@ -985,13 +823,217 @@ export default function OpikInsightsPage() {
         </CardContent>
       </Card>
 
+      {/* Learned Preferences with Evidence Trail - Collapsible */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer"
+          onClick={() => setPreferencesCollapsed(!preferencesCollapsed)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Brain className="h-5 w-5 text-purple-600" />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Learned Preferences
+                  <Badge variant="outline" className="ml-2">
+                    {preferencesData?.activePreferences || 0} active
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  {preferencesCollapsed
+                    ? "Click to expand and see what the AI has learned"
+                    : "What the AI has learned about your scheduling preferences"}
+                </CardDescription>
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <InfoButton info="Lists all preferences the AI has learned about you. Each preference shows evidence (completed/skipped tasks) that led to the insight. You can 'Forget' preferences you don't want the AI to use, or delete them entirely." />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fetchPreferences();
+                }}
+                disabled={preferencesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${preferencesLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              {preferencesCollapsed ? (
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+              ) : (
+                <ChevronUp className="h-5 w-5 text-gray-400" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        {!preferencesCollapsed && (
+          <CardContent>
+            {preferencesLoading && !preferencesData ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+              </div>
+            ) : preferencesData?.preferences.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Brain className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>No preferences learned yet</p>
+                <p className="text-sm">Complete or skip some tasks to help the AI learn!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {preferencesData?.preferences.map((pref) => (
+                  <div
+                    key={pref.id}
+                    className={`border rounded-lg overflow-hidden ${
+                      pref.isActive ? "border-purple-200" : "border-gray-200 opacity-60"
+                    }`}
+                  >
+                    {/* Preference Header */}
+                    <div
+                      className={`p-4 cursor-pointer ${
+                        pref.isActive ? "bg-purple-50" : "bg-gray-50"
+                      }`}
+                      onClick={() =>
+                        setExpandedPreference(expandedPreference === pref.id ? null : pref.id)
+                      }
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Brain className={`h-4 w-4 ${pref.isActive ? "text-purple-600" : "text-gray-400"}`} />
+                            <span className="font-medium">{pref.taskName}</span>
+                            {!pref.isActive && (
+                              <Badge variant="outline" className="text-xs">Forgotten</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{pref.insight}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Target className="h-3 w-3" />
+                              {pref.confidence}% confidence
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <BarChart3 className="h-3 w-3" />
+                              {pref.summary.totalEvidence} data points
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3 text-green-600" />
+                              {pref.summary.completedCount} completed
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <XCircle className="h-3 w-3 text-orange-600" />
+                              {pref.summary.skippedCount} skipped
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {expandedPreference === pref.id ? (
+                            <ChevronUp className="h-4 w-4 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expanded Evidence Trail */}
+                    {expandedPreference === pref.id && (
+                      <div className="border-t border-purple-100">
+                        {/* Action Buttons */}
+                        <div className="p-3 bg-white border-b border-purple-100 flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePreferenceActive(pref.id, pref.isActive);
+                            }}
+                            disabled={updatingPreference === pref.id}
+                          >
+                            {updatingPreference === pref.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : pref.isActive ? (
+                              <EyeOff className="h-3 w-3 mr-1" />
+                            ) : (
+                              <Eye className="h-3 w-3 mr-1" />
+                            )}
+                            {pref.isActive ? "Forget This" : "Re-enable"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deletePreference(pref.id);
+                            }}
+                            disabled={updatingPreference === pref.id}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete Permanently
+                          </Button>
+                        </div>
+
+                        {/* Evidence List */}
+                        <div className="p-3 bg-white max-h-64 overflow-y-auto">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                            Evidence Trail ({pref.evidence.length} data points)
+                          </p>
+                          <div className="space-y-2">
+                            {pref.evidence.map((ev) => (
+                              <div
+                                key={ev.id}
+                                className="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded"
+                              >
+                                {ev.signalType === "completed" ? (
+                                  <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                                ) : ev.signalType === "skipped" ? (
+                                  <XCircle className="h-4 w-4 text-orange-600 shrink-0" />
+                                ) : (
+                                  <RotateCcw className="h-4 w-4 text-blue-600 shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium capitalize">{ev.signalType}</span>
+                                  <span className="mx-2 text-gray-400">|</span>
+                                  <span className="text-gray-600">
+                                    {new Date(ev.scheduledTime).toLocaleDateString()} at{" "}
+                                    {new Date(ev.scheduledTime).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                  <span className="mx-2 text-gray-400">|</span>
+                                  <span className="text-gray-500 capitalize">
+                                    {ev.dayOfWeek} {ev.timeOfDay}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Opik Integration Details */}
       <Card className="bg-gray-50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Activity className="h-5 w-5 text-purple-600" />
-            Opik Integration Details
-          </CardTitle>
+          <div className="flex items-start gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Activity className="h-5 w-5 text-purple-600" />
+              Opik Integration Details
+            </CardTitle>
+            <InfoButton info="Technical details about how Opik (our LLM observability platform) tracks AI behavior. This shows what data is captured, what evaluations are run, and what metrics are monitored to ensure AI quality." />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -1034,32 +1076,40 @@ export default function OpikInsightsPage() {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  subtext,
-  className,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  subtext?: string;
-  className?: string;
-}) {
+function InfoButton({ info }: { info: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Card className={className}>
-      <CardContent className="pt-4">
-        <div className="flex items-center gap-3">
-          {icon}
-          <div>
-            <div className="text-sm text-gray-500">{label}</div>
-            <div className="text-xl font-bold">{value}</div>
-            {subtext && <div className="text-xs text-gray-400">{subtext}</div>}
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+        aria-label="More information"
+      >
+        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-8 z-50 w-72 p-3 bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-600">{info}</p>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-0.5 rounded hover:bg-gray-100"
+              >
+                <X className="h-3 w-3 text-gray-400" />
+              </button>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -211,7 +211,7 @@ export const AGENT_TOOL_DEFINITIONS = [
   {
     name: "analyze_task_fairness",
     description:
-      "Analyze how fairly household tasks are distributed between family members. Family ID is automatically determined.",
+      "Analyze how fairly Life Admin tasks are distributed between family members. Family ID is automatically determined.",
     input_schema: {
       type: "object" as const,
       properties: {

@@ -281,11 +281,11 @@ export default function CalendarPage() {
       <div className="flex flex-wrap justify-center gap-4 text-xs">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-blue-500"></div>
-          <span>Resolution Tasks</span>
+          <span>Focus Time</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-green-500"></div>
-          <span>Household Tasks</span>
+          <span>Life Admin</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-orange-400"></div>
@@ -469,11 +469,11 @@ export default function CalendarPage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-50 border-l-4 border-blue-500 rounded"></div>
-              <span className="text-sm text-gray-600">Resolution Tasks</span>
+              <span className="text-sm text-gray-600">Focus Time</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-50 border-l-4 border-green-500 rounded"></div>
-              <span className="text-sm text-gray-600">Household Tasks</span>
+              <span className="text-sm text-gray-600">Life Admin</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold text-gray-600">A</div>

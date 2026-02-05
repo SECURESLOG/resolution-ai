@@ -132,7 +132,7 @@ function buildSchedulingPrompt(params: {
     })),
   }));
 
-  return `You are ResolutionAI, an intelligent family scheduling assistant. Your job is to help ${userName} achieve their New Year's resolutions and manage household tasks by finding optimal time slots in their calendar.
+  return `You are ResolutionAI, an intelligent scheduling assistant. Your job is to help ${userName} achieve their goals and manage Life Admin by finding optimal time slots in their calendar.
 
 ## Week to Schedule
 From ${format(weekStart, "EEEE, MMMM d, yyyy")} to ${format(weekEnd, "EEEE, MMMM d, yyyy")}
@@ -148,9 +148,9 @@ ${JSON.stringify(tasksSummary, null, 2)}
 
 ## Priority Levels (1 = highest, 4 = lowest)
 1. Work commitments (already blocked in calendar)
-2. Non-flexible household tasks
-3. Resolution goals (gym, reading, learning, etc.)
-4. Flexible household tasks
+2. Non-flexible Life Admin tasks
+3. Focus Time goals (gym, reading, learning, deep work, etc.)
+4. Flexible Life Admin tasks
 
 ${learnedPreferences ? `## Learned Preferences from Previous Feedback\n${JSON.stringify(learnedPreferences, null, 2)}` : ""}
 
@@ -162,8 +162,8 @@ ${learnedPreferences ? `## Learned Preferences from Previous Feedback\n${JSON.st
    - The frequency field indicates how many times per week to schedule - match this with the number of entries you create
 2. Analyze the available time slots and tasks
 3. Schedule non-flexible tasks first at appropriate times
-4. Find optimal slots for resolution tasks (consider time of day preferences - gym in morning, reading in evening, etc.)
-5. Distribute remaining household tasks in available gaps
+4. Find optimal slots for Focus Time tasks (consider time of day preferences - gym in morning, reading in evening, etc.)
+5. Distribute remaining Life Admin tasks in available gaps
 6. For each scheduled task, explain WHY you chose that time slot
 7. If a task cannot fit due to constraints, add it to conflicts with alternatives
 
@@ -454,7 +454,7 @@ function buildFamilySchedulingPrompt(params: {
     frequencyPeriod: t.frequencyPeriod,
   }));
 
-  return `You are ResolutionAI, an intelligent FAMILY scheduling assistant. Your job is to help a 2-person family achieve their New Year's resolutions and fairly distribute household tasks by analyzing BOTH calendars.
+  return `You are ResolutionAI, an intelligent FAMILY scheduling assistant. Your job is to help a 2-person family achieve their goals and fairly distribute Life Admin tasks by analyzing BOTH calendars.
 
 ## Week to Schedule
 From ${format(weekStart, "EEEE, MMMM d, yyyy")} to ${format(weekEnd, "EEEE, MMMM d, yyyy")}
@@ -470,24 +470,24 @@ ${JSON.stringify(m.calendar, null, 2)}
 **Available Time Slots:**
 ${JSON.stringify(m.availableSlots, null, 2)}
 
-**Personal Tasks (resolutions):**
+**Personal Tasks (Focus Time):**
 ${JSON.stringify(m.personalTasks, null, 2)}
 `).join("\n")}
 
-## Shared Household Tasks (to be fairly distributed)
+## Shared Life Admin Tasks (to be fairly distributed)
 ${JSON.stringify(sharedTasksSummary, null, 2)}
 
 ## Priority Levels (1 = highest, 4 = lowest)
 1. Work commitments (already blocked in calendar)
-2. Non-flexible household tasks
-3. Resolution goals (gym, reading, learning, etc.)
-4. Flexible household tasks
+2. Non-flexible Life Admin tasks
+3. Focus Time goals (gym, reading, learning, deep work, etc.)
+4. Flexible Life Admin tasks
 
 ## IMPORTANT: Fair Distribution Rules
-1. Household tasks should be distributed FAIRLY between both family members
+1. Life Admin tasks should be distributed FAIRLY between both family members
 2. Consider who has more free time on each day
 3. Assign tasks to the person who is AVAILABLE at that time
-4. Personal resolution tasks go to the owner of that task
+4. Personal Focus Time tasks go to the owner of that task
 5. Calculate and report a fairness score (50/50 is ideal)
 
 ## Instructions
@@ -498,8 +498,8 @@ ${JSON.stringify(sharedTasksSummary, null, 2)}
    - The frequency field indicates how many times per week to schedule - match this with the number of entries you create
    - Example: If fixedDays="Monday, Tuesday, Wednesday, Thursday, Friday" and frequency=5, create 5 entries (one for Mon, Tue, Wed, Thu, Fri)
 2. First analyze BOTH calendars to understand each person's availability
-3. Assign personal resolution tasks to their respective owners at optimal times
-4. Distribute shared household tasks fairly based on availability
+3. Assign personal Focus Time tasks to their respective owners at optimal times
+4. Distribute shared Life Admin tasks fairly based on availability
 5. For each task, specify WHO it's assigned to (assignedToUserId)
 6. Explain why each task was assigned to that person
 7. If someone has a busy day, give more tasks to the other person that day

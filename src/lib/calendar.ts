@@ -308,35 +308,52 @@ export async function getCalendarEvents(
   } else if (provider === "google") {
     try {
       const calendar = await getGoogleCalendarClient(userId);
-      const response = await calendar.events.list({
-        calendarId: "primary",
-        timeMin: timeMin.toISOString(),
-        timeMax: timeMax.toISOString(),
-        singleEvents: true,
-        orderBy: "startTime",
-      });
 
-      const googleEvents = (response.data.items || []).map((event) => ({
-        id: event.id!,
-        summary: event.summary || "Untitled Event",
-        description: event.description || undefined,
-        start: {
-          dateTime: event.start?.dateTime || undefined,
-          date: event.start?.date || undefined,
-          timeZone: event.start?.timeZone || undefined,
-        },
-        end: {
-          dateTime: event.end?.dateTime || undefined,
-          date: event.end?.date || undefined,
-          timeZone: event.end?.timeZone || undefined,
-        },
-        status: event.status || undefined,
-        source: "google" as const,
-        calendarName: "Google Calendar",
-      }));
-      allEvents.push(...googleEvents);
+      // First, get list of all calendars the user has access to
+      const calendarList = await calendar.calendarList.list();
+      const calendars = calendarList.data.items || [];
+
+      // Fetch events from all calendars (primary, work, shared, etc.)
+      for (const cal of calendars) {
+        // Skip if calendar is hidden or not selected
+        if (cal.hidden || cal.selected === false) continue;
+
+        try {
+          const response = await calendar.events.list({
+            calendarId: cal.id!,
+            timeMin: timeMin.toISOString(),
+            timeMax: timeMax.toISOString(),
+            singleEvents: true, // This expands recurring events into individual instances
+            orderBy: "startTime",
+            maxResults: 250, // Increase limit to catch more events
+          });
+
+          const googleEvents = (response.data.items || []).map((event) => ({
+            id: event.id!,
+            summary: event.summary || "Untitled Event",
+            description: event.description || undefined,
+            start: {
+              dateTime: event.start?.dateTime || undefined,
+              date: event.start?.date || undefined,
+              timeZone: event.start?.timeZone || undefined,
+            },
+            end: {
+              dateTime: event.end?.dateTime || undefined,
+              date: event.end?.date || undefined,
+              timeZone: event.end?.timeZone || undefined,
+            },
+            status: event.status || undefined,
+            source: "google" as const,
+            calendarName: cal.summary || "Google Calendar",
+          }));
+          allEvents.push(...googleEvents);
+        } catch (calError) {
+          // Some calendars may fail (e.g., holidays), continue with others
+          console.error(`Error fetching calendar ${cal.summary}:`, calError);
+        }
+      }
     } catch (error) {
-      console.error("Error fetching Google calendar:", error);
+      console.error("Error fetching Google calendars:", error);
     }
   }
 

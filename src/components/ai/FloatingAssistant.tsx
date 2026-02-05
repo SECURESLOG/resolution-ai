@@ -20,28 +20,28 @@ import { useAIAssistant } from "@/contexts/AIAssistantContext";
 const PAGE_PROMPTS: Record<string, string[]> = {
   "/dashboard": [
     "What should I focus on today?",
-    "How am I doing on my resolutions?",
-    "Show my upcoming tasks",
+    "Am I overcommitting this week?",
+    "Show my upcoming time blocks",
   ],
   "/calendar": [
     "Find me a free slot tomorrow",
     "Reschedule my gym session",
     "What conflicts do I have?",
   ],
+  "/schedule": [
+    "What needs scheduling?",
+    "Find time for deep work",
+    "Am I balanced this week?",
+  ],
   "/weekly-plan": [
     "Explain this week's plan",
-    "Why was this task assigned to me?",
+    "What's taking most of my time?",
     "Suggest a better time for reading",
-  ],
-  "/tasks": [
-    "Which tasks need scheduling?",
-    "Schedule all my unscheduled tasks",
-    "Add a new task for meditation",
   ],
   "/insights": [
     "What patterns have you noticed?",
     "When am I most productive?",
-    "How can I improve my schedule?",
+    "How can I improve my balance?",
   ],
 };
 

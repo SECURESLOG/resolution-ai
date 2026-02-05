@@ -20,6 +20,29 @@ export const maxDuration = 60; // Allow up to 60 seconds for agent responses
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
+// Strip markdown formatting from AI responses
+function stripMarkdown(text: string): string {
+  return text
+    // Remove headers (## Header)
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove bold (**text** or __text__)
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    // Remove italic (*text* or _text_)
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    // Remove bullet points (- item or * item)
+    .replace(/^[\s]*[-*]\s+/gm, "")
+    // Remove numbered lists (1. item)
+    .replace(/^[\s]*\d+\.\s+/gm, "")
+    // Remove code blocks
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`(.+?)`/g, "$1")
+    // Clean up multiple newlines
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 interface ToolUseBlock {
   type: "tool_use";
   id: string;
@@ -113,46 +136,16 @@ Use this context to provide more relevant suggestions and help.
 `;
   }
 
-  return `You are an AI assistant for ResolutionAI, a family scheduling app that helps users manage their New Year's resolutions and household tasks. You help schedule tasks, resolve conflicts, and provide scheduling advice.
+  return `You are a friendly scheduling assistant. You MUST write all responses as plain text without ANY formatting. No asterisks, no dashes, no bullet points, no bold, no headers. Just normal sentences in short paragraphs like a casual text conversation.
 
-## Current User
-Name: ${userName}
+You help ${userName} with their ResolutionAI scheduling app, managing Focus Time (goals, deep work) and Life Admin (errands, chores). You can schedule tasks, check calendars, and help distribute tasks fairly.
 ${pageContextSection}
-## Family Context
-${familyContext}
+Family: ${familyContext}
+Preferences: ${preferencesContext}
 
-## User Preferences (Learned from feedback)
-${preferencesContext}
+Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}. Use tools to get real data. Use create_scheduled_task to schedule. For today use get_todays_tasks, tomorrow use get_tomorrows_tasks, week use get_weeks_tasks.
 
-## Your Capabilities
-You can help users with:
-1. **Natural Language Scheduling**: "Schedule gym for tomorrow morning" or "Find time for grocery shopping this week"
-2. **Conflict Resolution**: Detect and help resolve scheduling conflicts between family members
-3. **Schedule Optimization**: Suggest better times based on calendar density, preferences, and context
-4. **Task Management**: View tasks, check what's scheduled, see completion stats
-5. **Fairness Analysis**: Check if household tasks are distributed fairly between family members
-
-## Guidelines
-- Be helpful, concise, and friendly
-- When scheduling, always explain your reasoning
-- Consider the user's learned preferences (energy levels, preferred times, etc.)
-- For household tasks, consider fair distribution between family members
-- If you're unsure about something, ask for clarification
-- When creating schedules, aim for realistic, achievable plans
-- Respect existing calendar events - don't double-book
-
-## Important
-- Today's date is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-- Always use the tools to get real data before making recommendations
-- When scheduling tasks, use the create_scheduled_task tool
-- Always provide the AI reasoning when scheduling tasks
-
-## Tool Selection Guide
-- For today's tasks: use get_todays_tasks
-- For tomorrow's tasks: use get_tomorrows_tasks
-- For this week's tasks: use get_weeks_tasks
-- For another family member's tasks: first use get_family_info to get their userId, then use get_family_member_tasks with that userId
-- For custom date ranges: use get_scheduled_tasks`;
+REMINDER: Your responses must be plain text only. No markdown, no formatting symbols, no lists with dashes or asterisks. Write naturally like chatting with a friend.`;
 }
 
 export async function POST(request: NextRequest) {
@@ -357,7 +350,8 @@ export async function POST(request: NextRequest) {
       (block): block is TextBlock => block.type === "text"
     );
 
-    const assistantMessage = textBlocks.map((block) => block.text).join("\n");
+    const rawMessage = textBlocks.map((block) => block.text).join("\n");
+    const assistantMessage = stripMarkdown(rawMessage);
 
     // Add summary scores to trace
     trace.score({

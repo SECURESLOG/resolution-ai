@@ -15,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ResolutionAI - AI-Powered Family Scheduling",
-  description: "Achieve your New Year resolutions with intelligent AI scheduling that balances work, personal goals, and family responsibilities.",
+  title: "ResolutionAI - Take Back Control of Your Time",
+  description: "AI that eliminates scheduling decisions. Protect your focus time, balance your workload, and let AI handle when to do what.",
 };
 
 export default function RootLayout({

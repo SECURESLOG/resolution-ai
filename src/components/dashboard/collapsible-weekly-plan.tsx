@@ -15,7 +15,46 @@ import {
   Check,
   Sparkles,
   Edit,
+  Info,
+  X,
 } from "lucide-react";
+
+function InfoButton({ info }: { info: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+        aria-label="More information"
+      >
+        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-8 z-50 w-72 p-3 bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-600">{info}</p>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-0.5 rounded hover:bg-gray-100"
+              >
+                <X className="h-3 w-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 import { format, parseISO, startOfWeek, addDays } from "date-fns";
 
 interface ScheduledTask {
@@ -100,6 +139,7 @@ export function CollapsibleWeeklyPlan({
           <CardTitle className="text-base font-medium flex items-center gap-2">
             <Calendar className="h-5 w-5 text-blue-600" />
             Your Week, Optimized
+            <InfoButton info="Overview of your scheduled tasks for the week. Expand to see daily breakdown. AI optimizes task placement based on your calendar, preferences, and energy patterns." />
           </CardTitle>
           <div className="flex items-center gap-2">
             {totalTasks > 0 && (

@@ -331,9 +331,9 @@ export default function FamilyPage() {
             <h3 className="font-semibold text-blue-900 mb-2">Why create a family?</h3>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• AI considers both calendars when scheduling</li>
-              <li>• Fair distribution of household tasks</li>
-              <li>• See each other&apos;s scheduled tasks</li>
-              <li>• Coordinate resolutions and goals together</li>
+              <li>• Balanced distribution of life admin</li>
+              <li>• See each other&apos;s time blocks</li>
+              <li>• Coordinate focus time and goals together</li>
             </ul>
           </CardContent>
         </Card>
@@ -507,8 +507,8 @@ export default function FamilyPage() {
           <CardContent className="pt-6">
             <h3 className="font-semibold text-green-900 mb-2">Family Complete!</h3>
             <p className="text-sm text-green-800">
-              When you generate a schedule, the AI will now consider both calendars
-              and fairly distribute household tasks between family members.
+              When you generate a schedule, the AI will consider both calendars
+              and balance the workload fairly between family members.
             </p>
           </CardContent>
         </Card>

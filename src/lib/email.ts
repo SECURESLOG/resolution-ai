@@ -42,7 +42,7 @@ export async function sendFamilyInviteEmail({
               <strong>${inviterName}</strong> has invited you to join their family <strong>"${familyName}"</strong> on ResolutionAI.
             </p>
             <p style="margin-bottom: 24px;">
-              ResolutionAI helps families coordinate schedules and achieve New Year's resolutions together using AI-powered scheduling.
+              ResolutionAI helps families coordinate schedules and achieve their goals together using AI-powered scheduling.
             </p>
 
             <div style="background: white; border: 2px dashed #e5e7eb; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 24px;">
