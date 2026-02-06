@@ -44,6 +44,10 @@ model User {
   image               String?
   calendarConnected   Boolean   @default(false)
   preferences         Json?
+  country             String    @default("UK") // For public holiday detection
+  bufferMinutes       Int       @default(0) // Buffer time between tasks (0, 15, or 30 min)
+  availableTimeStart  Int       @default(6) // Earliest hour for scheduling (0-23, default 6am)
+  availableTimeEnd    Int       @default(22) // Latest hour for scheduling (0-23, default 10pm)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -61,6 +65,10 @@ model User {
   notifications        Notification[]
   weeklyPlanApprovals  WeeklyPlanApproval[]
   onboarding           OnboardingProgress?
+  workSchedule         UserWorkSchedule[]
+  vacations            UserVacation[]
+  reassignmentsFrom    TaskReassignmentLog[] @relation("ReassignedFrom")
+  reassignmentsTo      TaskReassignmentLog[] @relation("ReassignedTo")
 }
 
 model ExternalCalendar {
@@ -121,17 +129,18 @@ model FamilyMember {
 }
 
 model Task {
-  id         String   @id @default(cuid())
-  userId     String?
-  familyId   String?
-  name       String
-  type       String   // "resolution" or "household"
-  duration   Int      // in minutes (default/max duration for flexible tasks)
-  isFlexible Boolean  @default(true)
-  category   String?
-  priority   Int      @default(3) // 1-4, lower is higher priority
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                String   @id @default(cuid())
+  userId            String?
+  familyId          String?
+  name              String
+  type              String   // "resolution" or "household"
+  duration          Int      // in minutes (default/max duration for flexible tasks)
+  isFlexible        Boolean  @default(true)
+  category          String?
+  priority          Int      @default(3) // 1-4, lower is higher priority
+  defaultAssigneeId String?  // Learned default assignee for Life Admin tasks (null = creator)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Scheduling mode: "fixed" or "flexible"
   schedulingMode      String   @default("flexible")
@@ -156,6 +165,7 @@ model Task {
   conflicts         ScheduleConflict[] @relation("ConflictTask")
   displacedBy       ScheduleConflict[] @relation("DisplacedTask")
   recommendations   AIRecommendation[]
+  reassignmentLogs  TaskReassignmentLog[]
 }
 
 model ScheduledTask {
@@ -186,6 +196,9 @@ model ScheduledTask {
   // Partial overlap tracking (when task is shortened due to conflict)
   wasShortened        Boolean  @default(false)
   originalDuration    Int?     // Original duration before shortening
+
+  // Double-booking tracking (user intentionally scheduled over conflict)
+  wasDoubleBooked     Boolean  @default(false)
 
   task       Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   assignedTo User       @relation(fields: [assignedToUserId], references: [id], onDelete: Cascade)
@@ -501,4 +514,60 @@ model ScheduleOverlap {
   scheduledTask ScheduledTask? @relation(fields: [scheduledTaskId], references: [id], onDelete: SetNull)
 
   @@index([userId, weekOf])
+}
+
+// ============================================
+// WORK SCHEDULE & AVAILABILITY MODELS
+// ============================================
+
+// Per-day work schedule configuration
+model UserWorkSchedule {
+  id           String   @id @default(cuid())
+  userId       String
+  dayOfWeek    String   // "monday", "tuesday", etc.
+  isWorking    Boolean  @default(true)
+  startTime    String?  // "09:00" (24hr format)
+  endTime      String?  // "17:00" (24hr format)
+  location     String   @default("home") // "home", "office"
+  commuteToMin Int?     // Commute time to office in minutes
+  commuteFromMin Int?   // Commute time from office in minutes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek])
+  @@index([userId])
+}
+
+// User vacation/time-off periods
+model UserVacation {
+  id        String   @id @default(cuid())
+  userId    String
+  startDate DateTime
+  endDate   DateTime
+  note      String?  // Optional note like "Work trip", "Holiday"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate, endDate])
+}
+
+// Track task reassignments for learning default assignee
+model TaskReassignmentLog {
+  id             String   @id @default(cuid())
+  taskId         String
+  fromUserId     String   // Who it was reassigned from
+  toUserId       String   // Who it was reassigned to
+  scheduledTaskId String? // The specific scheduled instance (if applicable)
+  createdAt      DateTime @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromUser User @relation("ReassignedFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ReassignedTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, toUserId])
+  @@index([taskId, createdAt])
 }

@@ -13,6 +13,10 @@ import {
   CheckCircle,
   XCircle,
   Users,
+  Briefcase,
+  Car,
+  Palmtree,
+  PartyPopper,
 } from "lucide-react";
 import {
   format,
@@ -50,10 +54,18 @@ interface ScheduledTask {
   };
 }
 
+interface BlockedTime {
+  start: string;
+  end: string;
+  reason: string;
+  type: "work" | "commute" | "vacation" | "holiday";
+}
+
 // Combined type for unified rendering
 type CalendarItem =
   | { type: 'event'; data: CalendarEvent; sortTime: Date }
-  | { type: 'task'; data: ScheduledTask; sortTime: Date };
+  | { type: 'task'; data: ScheduledTask; sortTime: Date }
+  | { type: 'blocked'; data: BlockedTime; sortTime: Date };
 
 // Helper to extract start time from CalendarEvent
 function getEventStartTime(event: CalendarEvent): Date {
@@ -103,6 +115,7 @@ export default function CalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,9 +147,10 @@ export default function CalendarPage() {
         const startStr = format(weekStart, "yyyy-MM-dd");
         const endStr = format(weekEnd, "yyyy-MM-dd");
 
-        const [calendarRes, tasksRes] = await Promise.all([
+        const [calendarRes, tasksRes, blockedRes] = await Promise.all([
           fetch(`/api/calendar?start=${startStr}&end=${endStr}&family=true`),
           fetch(`/api/scheduled-tasks?view=week&date=${startStr}&family=true`),
+          fetch(`/api/user/blocked-times?start=${startStr}&end=${endStr}`),
         ]);
 
         if (calendarRes.ok) {
@@ -150,6 +164,10 @@ export default function CalendarPage() {
 
         if (tasksRes.ok) {
           setScheduledTasks(await tasksRes.json());
+        }
+
+        if (blockedRes.ok) {
+          setBlockedTimes(await blockedRes.json());
         }
       } catch (err) {
         console.error("Error fetching calendar data:", err);
@@ -238,8 +256,17 @@ export default function CalendarPage() {
         sortTime: parseISO(task.startTime),
       }));
 
+    // Get blocked times for this day
+    const dayBlocked = blockedTimes
+      .filter((block) => isSameDay(parseISO(block.start), date))
+      .map((block): CalendarItem => ({
+        type: 'blocked',
+        data: block,
+        sortTime: parseISO(block.start),
+      }));
+
     // Combine and sort by time
-    return [...dayEvents, ...dayTasks].sort(
+    return [...dayEvents, ...dayTasks, ...dayBlocked].sort(
       (a, b) => a.sortTime.getTime() - b.sortTime.getTime()
     );
   }
@@ -288,12 +315,24 @@ export default function CalendarPage() {
           <span>Life Admin</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-orange-400"></div>
-          <span>Work Calendar</span>
+          <div className="w-3 h-3 rounded bg-slate-400"></div>
+          <span>Work Hours</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-purple-400"></div>
-          <span>Family Work Calendar</span>
+          <div className="w-3 h-3 rounded bg-amber-400"></div>
+          <span>Commute</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-teal-400"></div>
+          <span>Vacation</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-rose-400"></div>
+          <span>Holiday</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-orange-400"></div>
+          <span>Work Calendar</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-gray-300"></div>
@@ -321,6 +360,14 @@ export default function CalendarPage() {
             const dayItems = getItemsForDay(day);
             const isToday = isSameDay(day, new Date());
 
+            // Check for all-day blocks (vacation or holiday)
+            const allDayBlocks = blockedTimes.filter((block) => {
+              const blockStart = parseISO(block.start);
+              const blockEnd = parseISO(block.end);
+              const duration = (blockEnd.getTime() - blockStart.getTime()) / (1000 * 60);
+              return isSameDay(blockStart, day) && duration >= 60 * 12;
+            });
+
             return (
               <Card key={day.toISOString()} className={isToday ? "border-blue-500 border-2" : ""}>
                 <CardHeader className="pb-2">
@@ -332,6 +379,24 @@ export default function CalendarPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 p-2">
+                  {/* All-day blocks banner */}
+                  {allDayBlocks.map((block) => (
+                    <div
+                      key={`allday-${block.start}`}
+                      className={`p-2 rounded text-xs text-center ${
+                        block.type === "vacation"
+                          ? "bg-teal-100 text-teal-700"
+                          : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {block.type === "vacation" ? (
+                        <Palmtree className="h-3 w-3 inline mr-1" />
+                      ) : (
+                        <PartyPopper className="h-3 w-3 inline mr-1" />
+                      )}
+                      {block.reason}
+                    </div>
+                  ))}
                   {/* Combined Events and Tasks sorted by time */}
                   {dayItems.map((item) => {
                     if (item.type === 'event') {
@@ -378,6 +443,64 @@ export default function CalendarPage() {
                               {event.calendarName}
                             </p>
                           )}
+                        </div>
+                      );
+                    } else if (item.type === 'blocked') {
+                      const block = item.data;
+                      const blockStart = parseISO(block.start);
+                      const blockEnd = parseISO(block.end);
+                      const blockDuration = Math.round((blockEnd.getTime() - blockStart.getTime()) / (1000 * 60));
+
+                      // Don't show all-day blocks inline (vacation/holiday)
+                      if (blockDuration >= 60 * 12) {
+                        return null; // Will be shown as a banner instead
+                      }
+
+                      const blockHeightClass = getDurationHeightClass(blockDuration);
+
+                      // Color and icon based on type
+                      let bgColor = "bg-slate-100 border-slate-400";
+                      let textColor = "text-slate-600";
+                      let Icon = Briefcase;
+
+                      switch (block.type) {
+                        case "work":
+                          bgColor = "bg-slate-100 border-slate-400";
+                          textColor = "text-slate-600";
+                          Icon = Briefcase;
+                          break;
+                        case "commute":
+                          bgColor = "bg-amber-50 border-amber-400";
+                          textColor = "text-amber-600";
+                          Icon = Car;
+                          break;
+                        case "vacation":
+                          bgColor = "bg-teal-50 border-teal-400";
+                          textColor = "text-teal-600";
+                          Icon = Palmtree;
+                          break;
+                        case "holiday":
+                          bgColor = "bg-rose-50 border-rose-400";
+                          textColor = "text-rose-600";
+                          Icon = PartyPopper;
+                          break;
+                      }
+
+                      return (
+                        <div
+                          key={`blocked-${block.start}-${block.type}`}
+                          className={`p-2 rounded text-xs border-l-4 ${bgColor} ${blockHeightClass} opacity-75`}
+                          title={`${block.reason} (${blockDuration} min)`}
+                        >
+                          <div className="flex items-start gap-1">
+                            <Icon className={`h-3 w-3 ${textColor} flex-shrink-0 mt-0.5`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{block.reason}</p>
+                              <p className={textColor}>
+                                {format(blockStart, "h:mm a")} - {format(blockEnd, "h:mm a")}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       );
                     } else {
@@ -474,6 +597,14 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-50 border-l-4 border-green-500 rounded"></div>
               <span className="text-sm text-gray-600">Life Admin</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-slate-100 border-l-4 border-slate-400 rounded"></div>
+              <span className="text-sm text-gray-600">Work Hours</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-amber-50 border-l-4 border-amber-400 rounded"></div>
+              <span className="text-sm text-gray-600">Commute</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold text-gray-600">A</div>

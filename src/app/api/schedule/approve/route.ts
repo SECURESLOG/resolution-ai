@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { createCalendarEvent, deleteCalendarEvent } from "@/lib/calendar";
+import { createCalendarEvent } from "@/lib/calendar";
 import { z } from "zod";
-import { parseISO, parse, startOfWeek, endOfWeek } from "date-fns";
+import { parseISO, parse } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -137,48 +137,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`Validation: ${validatedRecommendations.length}/${recommendations.length} tasks passed`);
 
-    // Calculate the week range from the first recommendation
-    if (validatedRecommendations.length > 0) {
-      const firstDate = parseISO(validatedRecommendations[0].date);
-      const weekStart = startOfWeek(firstDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(firstDate, { weekStartsOn: 1 });
-
-      // Find existing scheduled tasks for this week
-      const existingTasks = await prisma.scheduledTask.findMany({
-        where: {
-          assignedToUserId: session.user.id,
-          scheduledDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
-        },
-      });
-
-      // Delete existing calendar events and scheduled tasks
-      for (const task of existingTasks) {
-        if (task.calendarEventId) {
-          try {
-            await deleteCalendarEvent(session.user.id, task.calendarEventId);
-            console.log("Deleted calendar event:", task.calendarEventId);
-          } catch (error) {
-            console.log("Could not delete calendar event:", task.calendarEventId, error);
-          }
-        }
-      }
-
-      // Delete all existing scheduled tasks for the week
-      await prisma.scheduledTask.deleteMany({
-        where: {
-          assignedToUserId: session.user.id,
-          scheduledDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
-        },
-      });
-
-      console.log(`Cleared ${existingTasks.length} existing scheduled tasks for the week`);
-    }
+    // Note: We no longer delete existing scheduled tasks - we only ADD new ones
+    // This allows incremental scheduling (add one task, optimize, keep existing)
 
     const results = [];
     const filteredCount = recommendations.length - validatedRecommendations.length;
@@ -189,6 +149,25 @@ export async function POST(request: NextRequest) {
         const date = parseISO(rec.date);
         const startTime = parse(rec.startTime, "HH:mm", date);
         const endTime = parse(rec.endTime, "HH:mm", date);
+
+        // Check for existing scheduled task on this date to prevent duplicates
+        const existingScheduled = await prisma.scheduledTask.findFirst({
+          where: {
+            taskId: rec.taskId,
+            scheduledDate: date,
+            status: { not: "skipped" },
+          },
+        });
+
+        if (existingScheduled) {
+          console.log(`SKIPPED: ${rec.taskName} already scheduled on ${rec.date}`);
+          results.push({
+            success: false,
+            taskId: rec.taskId,
+            error: "Already scheduled on this date",
+          });
+          continue;
+        }
 
         // Create calendar event
         let calendarEventId: string | null = null;

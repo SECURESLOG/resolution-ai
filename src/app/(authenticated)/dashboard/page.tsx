@@ -17,17 +17,13 @@ import {
   CheckCircle,
   Calendar,
   Flame,
-  Sparkles,
   Target,
-  Home,
-  AlertCircle,
   Loader2,
   Undo2,
   Info,
   X,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { AIScheduleResponse, ScheduleRecommendation } from "@/types";
 
 interface Stats {
   todayTasks: number;
@@ -62,9 +58,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [todaySchedule, setTodaySchedule] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [scheduleResult, setScheduleResult] = useState<AIScheduleResponse | null>(null);
-  const [approving, setApproving] = useState(false);
   const [feedbackTask, setFeedbackTask] = useState<ScheduledTask | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [onboardingKey, setOnboardingKey] = useState(0);
@@ -91,12 +84,9 @@ export default function DashboardPage() {
     }
   }, [router, todaySchedule]);
 
-  const handleOnboardingGenerateSchedule = useCallback(async (type: "task" | "week") => {
-    if (type === "week") {
-      await generateSchedule();
-    } else {
-      router.push("/schedule");
-    }
+  const handleOnboardingGenerateSchedule = useCallback(async () => {
+    // Navigate to schedule page where "Optimize My Week" now lives
+    router.push("/schedule?optimize=true");
     setOnboardingKey(prev => prev + 1);
   }, [router]);
 
@@ -117,48 +107,6 @@ export default function DashboardPage() {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function generateSchedule() {
-    setGenerating(true);
-    setScheduleResult(null);
-
-    try {
-      const res = await fetch("/api/schedule/generate", { method: "POST" });
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "Failed to generate schedule");
-      setScheduleResult(data);
-    } catch (error) {
-      console.error("Error generating schedule:", error);
-      alert(error instanceof Error ? error.message : "Failed to generate schedule");
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  async function approveSchedule(recommendations: ScheduleRecommendation[]) {
-    setApproving(true);
-
-    try {
-      const res = await fetch("/api/schedule/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recommendations }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to approve schedule");
-
-      alert(data.message);
-      setScheduleResult(null);
-      fetchData();
-    } catch (error) {
-      console.error("Error approving schedule:", error);
-      alert(error instanceof Error ? error.message : "Failed to approve schedule");
-    } finally {
-      setApproving(false);
     }
   }
 
@@ -232,24 +180,6 @@ export default function DashboardPage() {
           </h1>
           <p className="text-gray-600 text-sm">{format(new Date(), "EEEE, MMMM d")} - Focus on doing, not deciding</p>
         </div>
-        <Button
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          onClick={generateSchedule}
-          disabled={generating}
-          size="sm"
-        >
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Optimizing...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Optimize My Week
-            </>
-          )}
-        </Button>
       </div>
 
       {/* Onboarding Checklist */}
@@ -337,67 +267,6 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Column - Today's Schedule */}
         <div className="lg:col-span-2 space-y-6">
-          {/* AI Schedule Result */}
-          {scheduleResult && (
-            <Card className="border-blue-200 bg-blue-50/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Sparkles className="h-5 w-5 text-blue-600" />
-                  AI Found Time For You
-                  <InfoButton info="AI has analyzed your calendar and found optimal time slots for your tasks. Review the suggestions and click 'Lock It In' to add them to your schedule." />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {scheduleResult.schedule.length > 0 ? (
-                  <>
-                    <p className="text-sm text-gray-600 mb-3">{scheduleResult.summary}</p>
-                    <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
-                      {scheduleResult.schedule.map((rec, index) => (
-                        <div key={index} className="flex items-center gap-3 p-2 bg-white rounded border">
-                          {rec.taskType === "resolution" ? (
-                            <Target className="h-4 w-4 text-blue-600" />
-                          ) : (
-                            <Home className="h-4 w-4 text-green-600" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{rec.taskName}</p>
-                            <p className="text-xs text-gray-500">
-                              {format(new Date(rec.date), "EEE, MMM d")} at {rec.startTime}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => approveSchedule(scheduleResult.schedule)}
-                        disabled={approving}
-                      >
-                        {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lock It In"}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setScheduleResult(null)}>
-                        Not Now
-                      </Button>
-                    </div>
-
-                    {scheduleResult.conflicts.length > 0 && (
-                      <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-                        <p className="text-xs text-yellow-800 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {scheduleResult.conflicts.length} item(s) need manual scheduling - your week is full!
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-gray-600 text-sm">Add tasks first, then let AI find the best times.</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           {/* Today's Schedule */}
           <Card>
             <CardHeader className="pb-2">
@@ -448,7 +317,7 @@ export default function DashboardPage() {
                             }`}>
                               {item.task.name}
                             </p>
-                            {item.streak && item.streak >= 2 && (
+                            {item.streak >= 2 && (
                               <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
                                 <Flame className="h-3 w-3" />
                                 {item.streak}
@@ -481,9 +350,11 @@ export default function DashboardPage() {
                   <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                   <p className="text-gray-500 text-sm">Your day is clear</p>
                   <p className="text-gray-400 text-xs mb-2">Let AI find time for what matters</p>
-                  <Button variant="link" size="sm" onClick={generateSchedule} disabled={generating}>
-                    Optimize my week
-                  </Button>
+                  <Link href="/schedule?optimize=true">
+                    <Button variant="link" size="sm">
+                      Optimize my week
+                    </Button>
+                  </Link>
                 </div>
               )}
             </CardContent>
@@ -493,8 +364,8 @@ export default function DashboardPage() {
         {/* Right Column - Weekly Plan & Health */}
         <div className="space-y-6">
           <CollapsibleWeeklyPlan
-            onGenerateSchedule={generateSchedule}
-            generating={generating}
+            onGenerateSchedule={() => router.push("/schedule?optimize=true")}
+            generating={false}
           />
           <ScheduleHealthWidget />
         </div>

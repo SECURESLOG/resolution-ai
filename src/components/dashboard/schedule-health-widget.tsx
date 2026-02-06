@@ -12,6 +12,9 @@ import {
   Lightbulb,
   Info,
   X,
+  Briefcase,
+  Palmtree,
+  PartyPopper,
 } from "lucide-react";
 
 function InfoButton({ info }: { info: string }) {
@@ -60,6 +63,12 @@ interface ScheduleHealth {
   impactPercentage: number;
   insight: string;
   severity: "low" | "medium" | "high";
+  // New work schedule conflict metrics
+  workScheduleConflicts?: number;
+  vacationConflicts?: number;
+  holidayConflicts?: number;
+  totalBlockedTimeConflicts?: number;
+  recommendations?: string[];
 }
 
 export function ScheduleHealthWidget() {
@@ -157,10 +166,46 @@ export function ScheduleHealthWidget() {
           </div>
         )}
 
+        {/* Work Schedule Conflicts Breakdown */}
+        {(health.totalBlockedTimeConflicts ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {(health.workScheduleConflicts ?? 0) > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded text-xs">
+                <Briefcase className="h-3 w-3 text-slate-600" />
+                <span>{health.workScheduleConflicts} during work</span>
+              </div>
+            )}
+            {(health.vacationConflicts ?? 0) > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-teal-100 rounded text-xs">
+                <Palmtree className="h-3 w-3 text-teal-600" />
+                <span>{health.vacationConflicts} on vacation</span>
+              </div>
+            )}
+            {(health.holidayConflicts ?? 0) > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-rose-100 rounded text-xs">
+                <PartyPopper className="h-3 w-3 text-rose-600" />
+                <span>{health.holidayConflicts} on holidays</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* AI Insight */}
         <div className="flex gap-2 p-3 bg-white rounded-lg border">
           <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-700">{health.insight}</p>
+          <div className="text-sm text-gray-700">
+            <p>{health.insight}</p>
+            {health.recommendations && health.recommendations.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {health.recommendations.map((rec, i) => (
+                  <li key={i} className="text-xs text-gray-500 flex items-start gap-1">
+                    <span className="text-gray-400">•</span>
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         {/* Actions */}

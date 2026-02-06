@@ -17,6 +17,8 @@ const updateSchema = z.object({
   scheduledDate: z.string().optional(), // ISO date string
   startTime: z.string().optional(), // ISO datetime string
   endTime: z.string().optional(), // ISO datetime string
+  // Reassignment field
+  assignedToUserId: z.string().optional(),
 });
 
 export async function PATCH(
@@ -34,14 +36,56 @@ export async function PATCH(
     const body = await request.json();
     const validatedData = updateSchema.parse(body);
 
-    const scheduledTask = await prisma.scheduledTask.findFirst({
-      where: {
-        id,
-        assignedToUserId: session.user.id,
-      },
+    // First find the task to check ownership and type
+    const scheduledTask = await prisma.scheduledTask.findUnique({
+      where: { id },
+      include: { task: true },
     });
 
     if (!scheduledTask) {
+      return NextResponse.json({ error: "Scheduled task not found" }, { status: 404 });
+    }
+
+    // Check if user can modify this task
+    const isOwner = scheduledTask.assignedToUserId === session.user.id;
+
+    // For reassignment, check family membership
+    if (validatedData.assignedToUserId && validatedData.assignedToUserId !== scheduledTask.assignedToUserId) {
+      // Only Life Admin (household) tasks can be reassigned
+      if (scheduledTask.task.type !== "household") {
+        return NextResponse.json(
+          { error: "Only Life Admin tasks can be reassigned" },
+          { status: 403 }
+        );
+      }
+
+      // Check if both users are in the same family
+      const currentUserFamily = await prisma.familyMember.findFirst({
+        where: { userId: session.user.id },
+      });
+
+      if (!currentUserFamily) {
+        return NextResponse.json(
+          { error: "You must be in a family to reassign tasks" },
+          { status: 403 }
+        );
+      }
+
+      const targetInSameFamily = await prisma.familyMember.findFirst({
+        where: {
+          userId: validatedData.assignedToUserId,
+          familyId: currentUserFamily.familyId,
+        },
+      });
+
+      if (!targetInSameFamily) {
+        return NextResponse.json(
+          { error: "Can only reassign to family members" },
+          { status: 403 }
+        );
+      }
+    } else if (!isOwner) {
+      // For non-reassignment updates, must be owner
       return NextResponse.json({ error: "Scheduled task not found" }, { status: 404 });
     }
 
@@ -70,6 +114,91 @@ export async function PATCH(
     }
     if (validatedData.endTime) {
       updateData.endTime = new Date(validatedData.endTime);
+    }
+
+    // Track reassignment patterns
+    let reassignmentPatternInfo: {
+      shouldPromptDefaultChange?: boolean;
+      shouldPromptOwnership?: boolean;
+      reassignmentCount?: number;
+      targetUserName?: string;
+    } = {};
+
+    // Handle reassignment
+    if (validatedData.assignedToUserId && validatedData.assignedToUserId !== scheduledTask.assignedToUserId) {
+      updateData.assignedToUserId = validatedData.assignedToUserId;
+
+      // Log the reassignment
+      await prisma.taskReassignmentLog.create({
+        data: {
+          taskId: scheduledTask.taskId,
+          fromUserId: scheduledTask.assignedToUserId,
+          toUserId: validatedData.assignedToUserId,
+          scheduledTaskId: scheduledTask.id,
+        },
+      });
+
+      // Check for reassignment patterns
+      const reassignmentLogs = await prisma.taskReassignmentLog.findMany({
+        where: { taskId: scheduledTask.taskId },
+        orderBy: { createdAt: "desc" },
+        take: 10, // Last 10 reassignments
+        include: {
+          toUser: { select: { name: true } },
+        },
+      });
+
+      // Pattern 1: Same person has been assigned 3+ times
+      const reassignmentsToTarget = reassignmentLogs.filter(
+        (log) => log.toUserId === validatedData.assignedToUserId
+      );
+      if (reassignmentsToTarget.length >= 3) {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: validatedData.assignedToUserId },
+          select: { name: true },
+        });
+        reassignmentPatternInfo = {
+          shouldPromptDefaultChange: true,
+          reassignmentCount: reassignmentsToTarget.length,
+          targetUserName: targetUser?.name || "this person",
+        };
+      }
+
+      // Pattern 2: Ping-pong (A->B, B->A pattern at least 2 times)
+      if (reassignmentLogs.length >= 4) {
+        let pingPongCount = 0;
+        for (let i = 0; i < reassignmentLogs.length - 1; i++) {
+          const current = reassignmentLogs[i];
+          const next = reassignmentLogs[i + 1];
+          // Check if this is a back-and-forth pattern
+          if (current.fromUserId === next.toUserId && current.toUserId === next.fromUserId) {
+            pingPongCount++;
+          }
+        }
+        if (pingPongCount >= 2) {
+          reassignmentPatternInfo.shouldPromptOwnership = true;
+        }
+      }
+
+      // Get current user's name for notification
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true },
+      });
+
+      // Create notification for the new assignee
+      await prisma.notification.create({
+        data: {
+          userId: validatedData.assignedToUserId,
+          type: "suggestion",
+          title: "Task Assigned to You",
+          message: `${currentUser?.name || "A family member"} assigned "${scheduledTask.task.name}" to you for ${new Date(scheduledTask.scheduledDate).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}.`,
+          actionUrl: "/schedule",
+          actionLabel: "View Schedule",
+          priority: "normal",
+          scheduledFor: new Date(),
+        },
+      });
     }
 
     const updated = await prisma.scheduledTask.update({
@@ -174,7 +303,13 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json(updated);
+    // Include reassignment pattern info in response if relevant
+    return NextResponse.json({
+      ...updated,
+      reassignmentPatternInfo: Object.keys(reassignmentPatternInfo).length > 0
+        ? reassignmentPatternInfo
+        : undefined,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });

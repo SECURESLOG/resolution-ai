@@ -75,6 +75,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createTaskSchema.parse(body);
 
+    // Validate: fixed scheduling mode requires fixedTime
+    if (validatedData.schedulingMode === "fixed" && !validatedData.fixedTime) {
+      return NextResponse.json(
+        { error: "Fixed schedule tasks require a specific time to be set" },
+        { status: 400 }
+      );
+    }
+
     // Extract fields for Prisma create
     const {
       schedulingMode,

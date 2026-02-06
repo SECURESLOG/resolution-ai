@@ -16,6 +16,9 @@ const updateTaskSchema = z.object({
   category: z.string().optional(),
   priority: z.number().min(1).max(4).optional(),
 
+  // Default assignee for Life Admin tasks (learned from reassignment patterns)
+  defaultAssigneeId: z.string().optional().nullable(),
+
   // Scheduling mode
   schedulingMode: z.enum(["fixed", "flexible"]).optional(),
 
@@ -84,6 +87,29 @@ export async function PATCH(
 
     const body = await request.json();
     const validatedData = updateTaskSchema.parse(body);
+
+    // Fetch existing task to validate constraints
+    const existingTask = await prisma.task.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!existingTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Determine the final scheduling mode and fixed time after update
+    const finalSchedulingMode = validatedData.schedulingMode ?? existingTask.schedulingMode;
+    const finalFixedTime = validatedData.fixedTime !== undefined
+      ? validatedData.fixedTime
+      : existingTask.fixedTime;
+
+    // Validate: fixed scheduling mode requires fixedTime
+    if (finalSchedulingMode === "fixed" && !finalFixedTime) {
+      return NextResponse.json(
+        { error: "Fixed schedule tasks require a specific time to be set" },
+        { status: 400 }
+      );
+    }
 
     const task = await prisma.task.updateMany({
       where: {

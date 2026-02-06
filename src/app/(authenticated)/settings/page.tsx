@@ -39,7 +39,21 @@ import {
   Mail,
   Send,
   MapPin,
+  Clock,
+  Briefcase,
+  Home,
+  Car,
+  Plane,
+  Globe,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { LocationSettings } from "@/components/settings/location-settings";
 
 interface CalendarProviders {
@@ -72,6 +86,44 @@ interface Family {
   inviteCode: string;
   members: FamilyMember[];
 }
+
+interface WorkScheduleDay {
+  dayOfWeek: string;
+  isWorking: boolean;
+  startTime: string | null;
+  endTime: string | null;
+  location: "home" | "office";
+  commuteToMin: number | null;
+  commuteFromMin: number | null;
+}
+
+interface Vacation {
+  id: string;
+  startDate: string;
+  endDate: string;
+  note: string | null;
+}
+
+interface PublicHoliday {
+  date: string;
+  name: string;
+  isObserved: boolean;
+}
+
+interface Country {
+  code: string;
+  name: string;
+}
+
+const DAYS_OF_WEEK = [
+  { value: "monday", label: "Mon", fullLabel: "Monday" },
+  { value: "tuesday", label: "Tue", fullLabel: "Tuesday" },
+  { value: "wednesday", label: "Wed", fullLabel: "Wednesday" },
+  { value: "thursday", label: "Thu", fullLabel: "Thursday" },
+  { value: "friday", label: "Fri", fullLabel: "Friday" },
+  { value: "saturday", label: "Sat", fullLabel: "Saturday" },
+  { value: "sunday", label: "Sun", fullLabel: "Sunday" },
+];
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -108,9 +160,34 @@ export default function SettingsPage() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
 
+  // Work Schedule state
+  const [workSchedule, setWorkSchedule] = useState<WorkScheduleDay[]>([]);
+  const [bufferMinutes, setBufferMinutes] = useState<number>(0);
+  const [availableTimeStart, setAvailableTimeStart] = useState<number>(6);
+  const [availableTimeEnd, setAvailableTimeEnd] = useState<number>(22);
+  const [country, setCountry] = useState<string>("UK");
+  const [supportedCountries, setSupportedCountries] = useState<Country[]>([]);
+  const [workScheduleLoading, setWorkScheduleLoading] = useState(true);
+  const [savingWorkSchedule, setSavingWorkSchedule] = useState(false);
+  const [workScheduleChanged, setWorkScheduleChanged] = useState(false);
+
+  // Vacation state
+  const [vacations, setVacations] = useState<Vacation[]>([]);
+  const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
+  const [vacationLoading, setVacationLoading] = useState(true);
+  const [addVacationOpen, setAddVacationOpen] = useState(false);
+  const [newVacationStart, setNewVacationStart] = useState("");
+  const [newVacationEnd, setNewVacationEnd] = useState("");
+  const [newVacationNote, setNewVacationNote] = useState("");
+  const [addingVacation, setAddingVacation] = useState(false);
+  const [deletingVacation, setDeletingVacation] = useState<string | null>(null);
+
   useEffect(() => {
     fetchData();
     fetchFamily();
+    fetchWorkSchedule();
+    fetchVacations();
+    fetchHolidays();
   }, []);
 
   async function fetchData() {
@@ -152,6 +229,157 @@ export default function SettingsPage() {
       console.error("Error fetching family:", error);
     } finally {
       setFamilyLoading(false);
+    }
+  }
+
+  async function fetchWorkSchedule() {
+    try {
+      const res = await fetch("/api/user/work-schedule");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkSchedule(data.schedules);
+        setBufferMinutes(data.bufferMinutes || 0);
+        setAvailableTimeStart(data.availableTimeStart ?? 6);
+        setAvailableTimeEnd(data.availableTimeEnd ?? 22);
+        setCountry(data.country || "UK");
+      }
+    } catch (error) {
+      console.error("Error fetching work schedule:", error);
+    } finally {
+      setWorkScheduleLoading(false);
+    }
+  }
+
+  async function fetchVacations() {
+    try {
+      const res = await fetch("/api/user/vacations");
+      if (res.ok) {
+        const data = await res.json();
+        setVacations(data.vacations || []);
+      }
+    } catch (error) {
+      console.error("Error fetching vacations:", error);
+    } finally {
+      setVacationLoading(false);
+    }
+  }
+
+  async function fetchHolidays() {
+    try {
+      const res = await fetch("/api/user/holidays?months=12");
+      if (res.ok) {
+        const data = await res.json();
+        setHolidays(data.holidays || []);
+        setSupportedCountries(data.supportedCountries || []);
+      }
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+    }
+  }
+
+  async function saveWorkSchedule() {
+    setSavingWorkSchedule(true);
+    try {
+      const res = await fetch("/api/user/work-schedule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schedules: workSchedule,
+          bufferMinutes,
+          availableTimeStart,
+          availableTimeEnd,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to save work schedule");
+      }
+
+      setWorkScheduleChanged(false);
+    } catch (error) {
+      alert("Failed to save work schedule");
+      console.error("Error saving work schedule:", error);
+    } finally {
+      setSavingWorkSchedule(false);
+    }
+  }
+
+  async function updateCountry(newCountry: string) {
+    try {
+      const res = await fetch("/api/user/country", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country: newCountry }),
+      });
+
+      if (res.ok) {
+        setCountry(newCountry);
+        // Refresh holidays for new country
+        fetchHolidays();
+      }
+    } catch (error) {
+      console.error("Error updating country:", error);
+    }
+  }
+
+  function updateWorkScheduleDay(dayOfWeek: string, updates: Partial<WorkScheduleDay>) {
+    setWorkSchedule((prev) =>
+      prev.map((day) =>
+        day.dayOfWeek === dayOfWeek ? { ...day, ...updates } : day
+      )
+    );
+    setWorkScheduleChanged(true);
+  }
+
+  async function addVacation() {
+    if (!newVacationStart || !newVacationEnd) return;
+    setAddingVacation(true);
+
+    try {
+      const res = await fetch("/api/user/vacations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: newVacationStart,
+          endDate: newVacationEnd,
+          note: newVacationNote || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add vacation");
+      }
+
+      const data = await res.json();
+      setVacations([...vacations, data.vacation]);
+      setNewVacationStart("");
+      setNewVacationEnd("");
+      setNewVacationNote("");
+      setAddVacationOpen(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to add vacation");
+    } finally {
+      setAddingVacation(false);
+    }
+  }
+
+  async function deleteVacation(id: string) {
+    if (!confirm("Delete this time off?")) return;
+    setDeletingVacation(id);
+
+    try {
+      const res = await fetch(`/api/user/vacations/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setVacations(vacations.filter((v) => v.id !== id));
+      }
+    } catch (error) {
+      console.error("Error deleting vacation:", error);
+    } finally {
+      setDeletingVacation(null);
     }
   }
 
@@ -364,10 +592,14 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue={defaultTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="account" className="flex items-center gap-1.5">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Account</span>
+          </TabsTrigger>
+          <TabsTrigger value="schedule" className="flex items-center gap-1.5">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Work Schedule</span>
           </TabsTrigger>
           <TabsTrigger value="calendars" className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4" />
@@ -458,6 +690,430 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Work Schedule Tab */}
+        <TabsContent value="schedule" className="space-y-6">
+          {workScheduleLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <>
+              {/* Work Hours Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-5 w-5 text-gray-600" />
+                      <CardTitle>Work Hours</CardTitle>
+                    </div>
+                    {workScheduleChanged && (
+                      <Button
+                        size="sm"
+                        onClick={saveWorkSchedule}
+                        disabled={savingWorkSchedule}
+                      >
+                        {savingWorkSchedule ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  <CardDescription>
+                    Configure your typical work schedule. AI uses this to schedule tasks around your work.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Schedule Table */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Day</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Working</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Hours</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Location</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Commute</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {workSchedule.map((day) => {
+                          const dayInfo = DAYS_OF_WEEK.find((d) => d.value === day.dayOfWeek);
+                          return (
+                            <tr key={day.dayOfWeek} className={!day.isWorking ? "bg-gray-50" : ""}>
+                              <td className="px-3 py-2 font-medium">{dayInfo?.fullLabel}</td>
+                              <td className="px-3 py-2">
+                                <Switch
+                                  checked={day.isWorking}
+                                  onCheckedChange={(checked) =>
+                                    updateWorkScheduleDay(day.dayOfWeek, { isWorking: checked })
+                                  }
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                {day.isWorking ? (
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="time"
+                                      value={day.startTime || "09:00"}
+                                      onChange={(e) =>
+                                        updateWorkScheduleDay(day.dayOfWeek, { startTime: e.target.value })
+                                      }
+                                      className="w-24 h-8 text-xs"
+                                    />
+                                    <span className="text-gray-400">-</span>
+                                    <Input
+                                      type="time"
+                                      value={day.endTime || "17:00"}
+                                      onChange={(e) =>
+                                        updateWorkScheduleDay(day.dayOfWeek, { endTime: e.target.value })
+                                      }
+                                      className="w-24 h-8 text-xs"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {day.isWorking ? (
+                                  <Select
+                                    value={day.location}
+                                    onValueChange={(value: "home" | "office") =>
+                                      updateWorkScheduleDay(day.dayOfWeek, {
+                                        location: value,
+                                        commuteToMin: value === "home" ? null : day.commuteToMin,
+                                        commuteFromMin: value === "home" ? null : day.commuteFromMin,
+                                      })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-24 h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="home">
+                                        <span className="flex items-center gap-1">
+                                          <Home className="h-3 w-3" /> Home
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="office">
+                                        <span className="flex items-center gap-1">
+                                          <Briefcase className="h-3 w-3" /> Office
+                                        </span>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {day.isWorking && day.location === "office" ? (
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <Car className="h-3 w-3 text-gray-400" />
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="180"
+                                      value={day.commuteToMin || ""}
+                                      onChange={(e) =>
+                                        updateWorkScheduleDay(day.dayOfWeek, {
+                                          commuteToMin: e.target.value ? parseInt(e.target.value) : null,
+                                        })
+                                      }
+                                      placeholder="To"
+                                      className="w-14 h-8 text-xs"
+                                    />
+                                    <span className="text-gray-400">/</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="180"
+                                      value={day.commuteFromMin || ""}
+                                      onChange={(e) =>
+                                        updateWorkScheduleDay(day.dayOfWeek, {
+                                          commuteFromMin: e.target.value ? parseInt(e.target.value) : null,
+                                        })
+                                      }
+                                      placeholder="From"
+                                      className="w-14 h-8 text-xs"
+                                    />
+                                    <span className="text-gray-400 text-xs">min</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Buffer Time */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">Buffer between tasks</p>
+                      <p className="text-xs text-gray-500">Add breathing room between scheduled tasks</p>
+                    </div>
+                    <Select
+                      value={bufferMinutes.toString()}
+                      onValueChange={(value) => {
+                        setBufferMinutes(parseInt(value));
+                        setWorkScheduleChanged(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">None</SelectItem>
+                        <SelectItem value="15">15 min</SelectItem>
+                        <SelectItem value="30">30 min</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Personal Time Window */}
+                  <div className="p-3 bg-blue-50 rounded-lg space-y-3">
+                    <div>
+                      <p className="font-medium text-sm">Personal Time Window</p>
+                      <p className="text-xs text-gray-500">Tasks will only be scheduled within this window, outside your work hours</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">From</Label>
+                        <Select
+                          value={availableTimeStart.toString()}
+                          onValueChange={(value) => {
+                            setAvailableTimeStart(parseInt(value));
+                            setWorkScheduleChanged(true);
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <SelectItem key={i} value={i.toString()}>
+                                {i === 0 ? "12 AM" : i < 12 ? `${i} AM` : i === 12 ? "12 PM" : `${i - 12} PM`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">To</Label>
+                        <Select
+                          value={availableTimeEnd.toString()}
+                          onValueChange={(value) => {
+                            setAvailableTimeEnd(parseInt(value));
+                            setWorkScheduleChanged(true);
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <SelectItem key={i} value={i.toString()}>
+                                {i === 0 ? "12 AM" : i < 12 ? `${i} AM` : i === 12 ? "12 PM" : `${i - 12} PM`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Country & Public Holidays */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-gray-600" />
+                    <CardTitle>Country & Public Holidays</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Public holidays are automatically blocked for scheduling
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Your Country</Label>
+                    <Select value={country} onValueChange={updateCountry}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {supportedCountries.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {holidays.length > 0 && (
+                    <div className="border rounded-lg p-3">
+                      <p className="text-sm font-medium mb-2">Upcoming Public Holidays</p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {holidays.slice(0, 10).map((holiday, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between text-sm py-1"
+                          >
+                            <span className="text-gray-600">{holiday.name}</span>
+                            <span className="text-gray-400">
+                              {new Date(holiday.date).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Vacation / Time Off */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Plane className="h-5 w-5 text-gray-600" />
+                      <CardTitle>Time Off</CardTitle>
+                    </div>
+                    <Dialog open={addVacationOpen} onOpenChange={setAddVacationOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Time Off</DialogTitle>
+                          <DialogDescription>
+                            Block out dates when you&apos;re not available for tasks
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 mt-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>From</Label>
+                              <Input
+                                type="date"
+                                value={newVacationStart}
+                                onChange={(e) => setNewVacationStart(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>To</Label>
+                              <Input
+                                type="date"
+                                value={newVacationEnd}
+                                onChange={(e) => setNewVacationEnd(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Note (optional)</Label>
+                            <Input
+                              placeholder="e.g., Holiday, Work trip"
+                              value={newVacationNote}
+                              onChange={(e) => setNewVacationNote(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            className="w-full"
+                            onClick={addVacation}
+                            disabled={addingVacation || !newVacationStart || !newVacationEnd}
+                          >
+                            {addingVacation ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              "Add Time Off"
+                            )}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  <CardDescription>
+                    Vacations and time off periods. Tasks won&apos;t be assigned during these dates.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {vacationLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  ) : vacations.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      <Plane className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">No time off scheduled</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {vacations.map((vacation) => (
+                        <div
+                          key={vacation.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">
+                              {new Date(vacation.startDate).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                              {" - "}
+                              {new Date(vacation.endDate).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                            {vacation.note && (
+                              <p className="text-xs text-gray-500">{vacation.note}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => deleteVacation(vacation.id)}
+                            disabled={deletingVacation === vacation.id}
+                          >
+                            {deletingVacation === vacation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Calendars Tab */}
