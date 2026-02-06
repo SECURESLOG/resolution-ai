@@ -317,7 +317,7 @@ export default function DashboardPage() {
                             }`}>
                               {item.task.name}
                             </p>
-                            {item.streak >= 2 && (
+                            {(item.streak ?? 0) >= 2 && (
                               <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
                                 <Flame className="h-3 w-3" />
                                 {item.streak}
