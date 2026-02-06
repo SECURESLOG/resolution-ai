@@ -1,163 +1,166 @@
 # ResolutionAI
 
-**AI-powered scheduling that turns New Year's resolutions into lasting habits.**
+**AI-powered scheduling that eliminates decision fatigue and brings work-life balance.**
 
 ---
 
 ## The Problem
 
-**92% of New Year's resolutions fail.** Why?
+**We're overwhelmed.** Modern life demands we juggle:
 
-- **Scheduling conflicts** — "I'll go to the gym... but I have meetings all day"
-- **Family obligations** — "I wanted to read, but the kids needed me"
-- **Life gets in the way** — "I was too tired after work"
+- Work calendars packed with meetings
+- Household responsibilities that never end
+- Personal goals we never find time for
+- Family obligations competing for attention
 
-The real issue isn't motivation — it's **planning**. Most people set goals without accounting for their actual life: work calendars, family schedules, energy levels, and daily chaos.
+The result? **Decision fatigue.** Every day we waste mental energy deciding *when* to do things instead of just *doing* them. We over-schedule, burn out, and watch our productivity goals slip away.
 
 ---
 
 ## The Solution
 
-**ResolutionAI** is an AI assistant that plans around YOUR life — not the other way around.
+**ResolutionAI** is an AI scheduling assistant that takes control of your time - so you don't have to think about it.
 
 ```
-Your Goals + Your Calendar + Your Family = A Plan That Actually Works
+Your Goals + Your Calendar + Your Life Constraints = A Plan That Actually Works
 ```
 
 ### How It Works
 
 | Step | What Happens |
 |------|--------------|
-| 1. **Connect** | Link your Google/Outlook calendar and add family members |
-| 2. **Define** | Set your resolutions and household responsibilities |
-| 3. **Generate** | AI analyzes everyone's schedules and creates an optimal weekly plan |
-| 4. **Live** | Tasks appear at the right time, fairly distributed |
-| 5. **Learn** | AI gets smarter with every feedback you provide |
-
----
-
-## The Magic: AI That Learns
-
-This isn't a static scheduler. **ResolutionAI learns from you.**
-
-```
-Week 1: AI suggests gym at 6 AM
-        You skip it → "Too early"
-
-Week 2: AI suggests gym at 7 PM
-        You complete it → "Perfect!"
-
-Week 3+: AI remembers you're an evening exerciser
-         Accuracy improves. Habits form.
-```
-
-### What the AI Learns:
-
-- **Time preferences** — Morning person? Night owl?
-- **Energy patterns** — When you're most productive
-- **Family dynamics** — Who's busier on which days
-- **Task patterns** — How long things actually take you
-
----
-
-## The Proof: Measured with Opik
-
-We don't just claim the AI improves — **we prove it.**
-
-Using [Comet Opik](https://www.comet.com/site/products/opik/) for LLM observability, we track every aspect of AI performance:
-
-### AI Learning Loop
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESOLUTIONAI LEARNING LOOP                   │
-└─────────────────────────────────────────────────────────────────┘
-
-     ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-     │   INPUTS    │         │  AI ENGINE  │         │   OUTPUT    │
-     │─────────────│         │─────────────│         │─────────────│
-     │ • Goals     │────────▶│  Claude AI  │────────▶│ Weekly Plan │
-     │ • Calendar  │         │      +      │         │ Scheduled   │
-     │ • Family    │         │  Learning   │         │ Tasks       │
-     │ • Prefs     │         │  Context    │         │             │
-     └─────────────┘         └──────┬──────┘         └──────┬──────┘
-                                    │                       │
-                             ┌──────▼──────┐                │
-                             │    OPIK     │                │
-                             │ OBSERVABILITY│                │
-                             │─────────────│                │
-                             │ • Traces    │                │
-                             │ • Metrics   │                │
-                             │ • Evals     │                │
-                             └──────┬──────┘                │
-                                    │                       │
-                                    │    ┌──────────────────▼───┐
-                                    │    │     USER ACTIONS     │
-                                    │    │──────────────────────│
-                                    │    │  ✓ Complete task     │
-                                    │    │  ✗ Skip task         │
-                                    │    │  📝 Give feedback    │
-                                    │    └──────────┬───────────┘
-                                    │               │
-                             ┌──────▼───────────────▼──────┐
-                             │     LEARNING FEEDBACK       │
-                             │────────────────────────────│
-                             │ • Update preferences        │
-                             │ • Calculate accuracy        │
-                             │ • Improve next schedule     │
-                             └──────────────┬──────────────┘
-                                            │
-                             ┌──────────────▼──────────────┐
-                             │   OPIK LEARNING DASHBOARD   │
-                             │────────────────────────────│
-                             │ 📈 Accuracy: 62% → 84%     │
-                             │ 📊 Completion: +18%        │
-                             │ 🎯 Preferences: 14 learned │
-                             └─────────────────────────────┘
-```
-
-### What We Track in Opik:
-
-| Metric | What It Measures |
-|--------|------------------|
-| **Scheduling Accuracy** | Did the user complete tasks at scheduled times? |
-| **Completion Rate** | Overall task completion trending over weeks |
-| **Preference Confidence** | How certain AI is about learned patterns |
-| **Family Fairness** | Even distribution of household tasks |
-| **Burnout Risk** | Preventing over-scheduling |
+| 1. **Connect** | Link your Google/Outlook calendar and set your work schedule |
+| 2. **Define** | Add your productivity goals and life admin tasks |
+| 3. **Configure** | Set your available hours, work times, commute, and time off |
+| 4. **Optimize** | AI analyzes your schedule and finds the perfect time slots |
+| 5. **Execute** | Drag, drop, and complete - your week is planned |
 
 ---
 
 ## Key Features
 
-### Smart Scheduling
-- AI finds optimal time slots around your real commitments
-- Respects fixed constraints (school pickup at 4:30 PM, gym MWF only)
-- Balances resolution goals with household duties
+### Intelligent Time Protection
 
-### Family Coordination
-- 2-person family scheduling
-- Fair task distribution algorithm
-- Shared calendar visibility (see partner's work calendar)
-- Family approval workflow for weekly plans
+- **Personal Time Window** - Set when you're available (6 AM - 11 PM, you decide)
+- **Work Schedule Awareness** - AI knows your work hours and won't schedule during them
+- **Commute Blocking** - Morning and evening commute times are protected
+- **Vacation & Holiday Support** - Time off is automatically respected
 
-### Calendar Integration
-- Google Calendar
-- Microsoft Outlook / Azure AD
-- External ICS calendars (work calendars)
-- Color-coded event types
+### Hybrid AI Scheduling
 
-### AI That Improves
-- Learns from every completed/skipped task
-- Adapts to your energy patterns
-- Remembers time preferences
-- Gets smarter every week
+Our unique **Deterministic + AI** approach ensures predictable, intelligent scheduling:
 
-### Progress & Motivation
-- Streak tracking
-- Weekly progress visualization
-- Daily AI insights
-- Completion celebrations
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    HYBRID SCHEDULING ENGINE                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   DETERMINISTIC LAYER (Predictable)                             │
+│   ├── Frequency: "4x per week" = exactly 4 scheduled slots      │
+│   ├── Fixed Days: "Monday, Wednesday, Friday" = those days only │
+│   ├── Fixed Times: "7:00 AM" = that exact time                  │
+│   └── Constraints: Work hours, commute, vacations respected     │
+│                                                                  │
+│   AI LAYER (Intelligent)                                         │
+│   ├── Optimal time selection within available slots             │
+│   ├── Energy pattern awareness (morning vs evening person)      │
+│   ├── Calendar conflict avoidance                               │
+│   └── Fair family task distribution                             │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Result:** You get the predictability of rules-based scheduling with the intelligence of AI optimization.
+
+### Schedule Control
+
+- **Drag & Drop** - Move tasks to any 15-minute slot
+- **Quick Schedule** - One click to find the next available time
+- **Conflict Detection** - Visual warnings before you over-commit
+- **Schedule Health** - See at a glance what needs attention
+
+### Family Work-Life Balance
+
+- **2-Person Scheduling** - Coordinate with your partner
+- **Fair Distribution** - AI balances household tasks equitably
+- **Shared Visibility** - See each other's work calendars
+- **Prevent Resentment** - Data-driven fairness, not guesswork
+
+### Progress & Accountability
+
+- **Streak Tracking** - Build momentum with consecutive completions
+- **Weekly Progress** - Visual completion rates by day
+- **AI Insights** - Daily personalized recommendations
+- **Learning System** - AI improves from your feedback
+
+---
+
+## The Productivity Mindset
+
+ResolutionAI is built for people who want to:
+
+| Traditional Thinking | ResolutionAI Thinking |
+|---------------------|----------------------|
+| "I need to find time to exercise" | "My exercise time is protected automatically" |
+| "I'll do chores when I have time" | "Life admin is scheduled like any meeting" |
+| "My partner should do more" | "AI ensures fair, data-driven distribution" |
+| "I'm always behind" | "My week is optimized before it starts" |
+| "I don't know what to do next" | "Decision fatigue eliminated" |
+
+---
+
+## AI Learning & Observability
+
+We don't just claim the AI improves - **we prove it** with [Comet Opik](https://www.comet.com/site/products/opik/).
+
+### You Control What AI Learns
+
+Unlike black-box AI systems, **ResolutionAI puts you in control of your data.**
+
+Every time you complete or skip a task, you choose:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  ✓ Task Completed: "Morning Run"                       │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│  Should AI learn from this?                            │
+│                                                        │
+│  [Yes, learn my preferences]  [No, just this once]     │
+│                                                        │
+│  ℹ️ AI will note that you prefer morning exercise      │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Skipped a task because of an emergency? Don't let it skew your preferences.
+- Completed something at an unusual time? Keep it as a one-off.
+- Want AI to learn faster? Opt in to every action.
+
+**Your preferences. Your control. Your choice.**
+
+### What We Track
+
+| Metric | What It Measures |
+|--------|------------------|
+| **Scheduling Accuracy** | Did tasks happen at scheduled times? |
+| **Completion Rate** | Overall task completion trending over weeks |
+| **Time Preference Learning** | Morning person? Evening person? AI adapts |
+| **Family Fairness Score** | Even distribution of household tasks |
+| **Burnout Prevention** | Detecting over-scheduling before it happens |
+
+### The Learning Loop
+
+```
+User completes task at 7 PM → AI asks "Learn from this?" → User says Yes
+    → AI notes "evening preference"
+
+User skips 6 AM task → AI asks "Learn from this?" → User says No
+    → AI ignores this one-off skip
+
+Week over week: Schedules get smarter based on YOUR choices
+```
 
 ---
 
@@ -178,21 +181,22 @@ Using [Comet Opik](https://www.comet.com/site/products/opik/) for LLM observabil
 
 ## Why ResolutionAI?
 
-| Traditional Apps | ResolutionAI |
-|------------------|--------------|
+| Other Apps | ResolutionAI |
+|------------|--------------|
 | Static todo lists | Dynamic AI scheduling |
-| Manual planning | Automatic optimization |
+| Manual time blocking | Automatic optimization |
 | Individual only | Family coordination |
-| No learning | Improves over time |
-| Hope-based | Data-driven (Opik) |
+| Fixed schedules | Learns and adapts |
+| No visibility | Full Opik observability |
+| Hope you remember | Integrated with your calendar |
 
 ---
 
 ## Categories
 
-- **Productivity & Work Habits** — Helping people build lasting habits around their real life
-- **Best Use of Opik** — Full observability into AI learning and improvement
+- **Productivity & Work Habits** — Eliminating decision fatigue and building sustainable routines
+- **Best Use of Opik** — Full observability into AI learning, scheduling accuracy, and user outcomes
 
 ---
 
-*"The best resolution app isn't one that reminds you to do things. It's one that finds when you actually can."*
+*"The most productive people don't have more time. They have systems that protect their time. ResolutionAI is that system."*
