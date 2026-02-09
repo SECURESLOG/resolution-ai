@@ -1,39 +1,78 @@
 # ResolutionAI
 
-**AI-powered scheduling that eliminates decision fatigue and brings work-life balance.**
+**AI-powered scheduling for busy families.** Eliminate decision fatigue, share the mental load, and finally stop arguing about who does what.
 
 ---
 
-## The Problem
+## The Real Problem
 
-**We're overwhelmed.** Modern life demands we juggle:
+It's Tuesday night. Dinner's done. And then it starts.
 
-- Work calendars packed with meetings
-- Household responsibilities that never end
-- Personal goals we never find time for
-- Family obligations competing for attention
+> *"Did you book the pediatrician?"*
+> *"I thought you were doing that."*
+> *"I did the groceries. And signed the school forms. And—"*
+> *"I've been in back-to-back meetings!"*
+> *"So have I! While also remembering that we're out of milk!"*
 
-The result? **Decision fatigue.** Every day we waste mental energy deciding *when* to do things instead of just *doing* them. We over-schedule, burn out, and watch our productivity goals slip away.
+**Sound familiar?**
+
+This isn't about who does more. It's about the **invisible work** of remembering who does what, and when.
+
+Research shows one partner carries **71% of the mental load** — the planning, the scheduling, the constant juggling. It's exhausting. And it causes resentment.
 
 ---
 
 ## The Solution
 
-**ResolutionAI** is an AI scheduling assistant that takes control of your time - so you don't have to think about it.
+**ResolutionAI** is an AI scheduling assistant that takes control of your family's time — so you can stop thinking about logistics and start living.
 
 ```
-Your Goals + Your Calendar + Your Life Constraints = A Plan That Actually Works
+Your Goals + Both Calendars + Life Constraints = A Plan That Actually Works
 ```
 
 ### How It Works
 
 | Step | What Happens |
 |------|--------------|
-| 1. **Connect** | Link your Google/Outlook calendar and set your work schedule |
-| 2. **Define** | Add your productivity goals and life admin tasks |
-| 3. **Configure** | Set your available hours, work times, commute, and time off |
-| 4. **Optimize** | AI analyzes your schedule and finds the perfect time slots |
-| 5. **Execute** | Drag, drop, and complete - your week is planned |
+| 1. **Connect** | Link your Google/Outlook calendars (both partners) |
+| 2. **Define** | Add your goals and household tasks |
+| 3. **Configure** | Set work hours, commutes, and personal time |
+| 4. **Optimize** | AI distributes tasks fairly based on real availability |
+| 5. **Execute** | Everyone knows what they're doing and when |
+
+---
+
+## Built for Families
+
+### The Mental Load Problem
+
+| The Reality | The Impact |
+|-------------|------------|
+| One partner carries **71%** of household mental load | Burnout and resentment |
+| "I thought you were doing that" | Dropped balls, arguments |
+| Invisible work goes unnoticed | Unfair distribution persists |
+| **35,000 decisions** per day | Decision fatigue by 3 PM |
+
+### How ResolutionAI Solves It
+
+- **Shared Family Calendar** - Both partners see everything in one place
+- **Fair Task Distribution** - AI assigns based on actual availability, not assumptions
+- **Visible Accountability** - No more "I do everything" debates — the data shows the truth
+- **Reduced Mental Load** - Stop remembering, start doing
+
+### The Transformation
+
+**Before ResolutionAI:**
+> *"Did you book the car service?"*
+> *"I thought you were."*
+> [Argument ensues]
+
+**After ResolutionAI:**
+> *"Dinner's done."*
+> *"Nice. I've got laundry tomorrow, you've got the pharmacy run."*
+> *"Already in my calendar. Want to watch something?"*
+
+**One less thing to argue about.**
 
 ---
 
@@ -79,13 +118,6 @@ Our unique **Deterministic + AI** approach ensures predictable, intelligent sche
 - **Conflict Detection** - Visual warnings before you over-commit
 - **Schedule Health** - See at a glance what needs attention
 
-### Family Work-Life Balance
-
-- **2-Person Scheduling** - Coordinate with your partner
-- **Fair Distribution** - AI balances household tasks equitably
-- **Shared Visibility** - See each other's work calendars
-- **Prevent Resentment** - Data-driven fairness, not guesswork
-
 ### Progress & Accountability
 
 - **Streak Tracking** - Build momentum with consecutive completions
@@ -95,16 +127,17 @@ Our unique **Deterministic + AI** approach ensures predictable, intelligent sche
 
 ---
 
-## The Productivity Mindset
+## The Mindset Shift
 
-ResolutionAI is built for people who want to:
+ResolutionAI is built for families who want to:
 
 | Traditional Thinking | ResolutionAI Thinking |
 |---------------------|----------------------|
 | "I need to find time to exercise" | "My exercise time is protected automatically" |
 | "I'll do chores when I have time" | "Life admin is scheduled like any meeting" |
-| "My partner should do more" | "AI ensures fair, data-driven distribution" |
-| "I'm always behind" | "My week is optimized before it starts" |
+| "Whose turn is it?" | "The schedule shows fair distribution" |
+| "You never help around here" | "Data proves who did what this week" |
+| "I'm always the one who remembers" | "AI remembers for both of us" |
 | "I don't know what to do next" | "Decision fatigue eliminated" |
 
 ---
@@ -188,7 +221,8 @@ Week over week: Schedules get smarter based on YOUR choices
 | Individual only | Family coordination |
 | Fixed schedules | Learns and adapts |
 | No visibility | Full Opik observability |
-| Hope you remember | Integrated with your calendar |
+| Hope you remember | AI remembers for you |
+| Guesswork fairness | Data-driven distribution |
 
 ---
 
@@ -230,7 +264,12 @@ curl -X POST http://localhost:3000/api/demo/seed
 curl http://localhost:3000/api/demo/seed
 ```
 
-This creates realistic demo data including tasks, schedules, historical completions, and AI learning data.
+This creates realistic demo data including:
+- A family with two members (different work schedules)
+- Focus tasks (exercise, meditation, reading)
+- Life admin tasks (groceries, school pickup, laundry)
+- 2 weeks of historical completions
+- AI learned preferences
 
 ---
 
@@ -241,4 +280,4 @@ This creates realistic demo data including tasks, schedules, historical completi
 
 ---
 
-*"The most productive people don't have more time. They have systems that protect their time. ResolutionAI is that system."*
+*"ResolutionAI doesn't just schedule tasks. It removes the invisible labor. It makes fairness visible. And it gives families something rare — one less thing to argue about."*
