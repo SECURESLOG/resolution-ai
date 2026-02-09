@@ -36,3 +36,11 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Pitch preparation documents (local only)
+PITCH_RESEARCH.md
+PRESENTATION_TEMPLATE.md
+
+# Local apps and tools
+Descript Installer.app/
+.claude/
