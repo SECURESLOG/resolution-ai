@@ -192,6 +192,48 @@ Week over week: Schedules get smarter based on YOUR choices
 
 ---
 
+## Getting Started
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/resolution-ai.git
+cd resolution-ai
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your API keys
+
+# Set up database
+npx prisma generate
+npx prisma db push
+
+# Run the app
+npm run dev
+```
+
+See the full **[Installation & Testing Guide](./INSTALLATION.md)** for detailed setup instructions.
+
+### Testing with Demo Data
+
+We provide a demo seed endpoint for testing:
+
+```bash
+# Seed demo data
+curl -X POST http://localhost:3000/api/demo/seed
+
+# Check current state
+curl http://localhost:3000/api/demo/seed
+```
+
+This creates realistic demo data including tasks, schedules, historical completions, and AI learning data.
+
+---
+
 ## Categories
 
 - **Productivity & Work Habits** — Eliminating decision fatigue and building sustainable routines
